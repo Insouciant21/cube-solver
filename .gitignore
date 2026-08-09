@@ -1,0 +1,14 @@
+.613-coding/
+.env
+.venv/
+node_modules/
+dist/
+test-results/
+playwright-report/
+.pytest_cache/
+solver-data/
+*.lookup
+*.lookup.part
+*.tbl
+*.tbl.part
+
