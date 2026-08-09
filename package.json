@@ -1,0 +1,13 @@
+{
+  "name": "613-cube-solver",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "test:web": "npm run test --workspace @613-cube-solver/web",
+    "lint:web": "npm run lint --workspace @613-cube-solver/web",
+    "typecheck:web": "npm run typecheck --workspace @613-cube-solver/web",
+    "build:web": "npm run build --workspace @613-cube-solver/web"
+  }
+}

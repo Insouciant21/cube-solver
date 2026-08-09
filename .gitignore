@@ -11,4 +11,8 @@ solver-data/
 *.lookup.part
 *.tbl
 *.tbl.part
-
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
