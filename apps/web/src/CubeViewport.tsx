@@ -39,6 +39,7 @@ export interface CubeViewportProps {
   animation?: CubeAnimation | null;
   animationDuration?: number;
   onViewChange?: (facing: ViewFacing, view: ViewTransform) => void;
+  onViewControlsReady?: (controls: ViewControls | null) => void;
 }
 
 const FACE_NORMAL_VECTORS = Object.fromEntries(
@@ -66,7 +67,7 @@ interface AnimationLayer {
   turns: 1 | 2 | 3;
 }
 
-interface ViewControls {
+export interface ViewControls {
   reset: () => void;
   fit: () => void;
   face: (face: CubeFace) => void;
@@ -175,10 +176,12 @@ export default function CubeViewport({
   animation = null,
   animationDuration = 420,
   onViewChange,
+  onViewControlsReady,
 }: CubeViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const callbackRef = useRef(onStickerClick);
   const viewCallbackRef = useRef(onViewChange);
+  const controlsCallbackRef = useRef(onViewControlsReady);
   const viewTransformRef = useRef<ViewTransform>({ ...DEFAULT_VIEW_TRANSFORM });
   const viewControlsRef = useRef<ViewControls>({
     reset: () => undefined,
@@ -203,6 +206,10 @@ export default function CubeViewport({
   useEffect(() => {
     viewCallbackRef.current = onViewChange;
   }, [onViewChange]);
+
+  useEffect(() => {
+    controlsCallbackRef.current = onViewControlsReady;
+  }, [onViewControlsReady]);
 
   useEffect(() => {
     latestStateRef.current = state;
@@ -478,6 +485,7 @@ export default function CubeViewport({
         applyViewTransform();
       },
     };
+    controlsCallbackRef.current?.(viewControlsRef.current);
 
     const onPointerDown = (event: PointerEvent) => {
       activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -564,6 +572,7 @@ export default function CubeViewport({
       observer.disconnect();
       if (sceneControllerRef.current) sceneControllerRef.current = null;
       viewControlsRef.current = { reset: () => undefined, fit: () => undefined, face: () => undefined };
+      controlsCallbackRef.current?.(null);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);

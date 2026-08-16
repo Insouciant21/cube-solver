@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  ButtonGroup,
   Chip,
   CssBaseline,
   Dialog,
@@ -24,7 +25,7 @@ import {
   useMediaQuery,
 } from "@mui/material";
 import PerfectScrollbar from "perfect-scrollbar";
-import CubeViewport, { type CubeAnimation } from "./CubeViewport";
+import CubeViewport, { type CubeAnimation, type CubeFace, type ViewControls } from "./CubeViewport";
 import {
   MAX_HISTORY,
   applyMove,
@@ -121,6 +122,7 @@ const theme = createTheme({
 
 const ORDERS = [2, 3, 4, 5, 6, 7] as const;
 const COLORS = ["白", "黄", "绿", "蓝", "橙", "红"] as const;
+const MOBILE_MEDIA_QUERY = "(max-width: 760px)";
 const MOBILE_LAYOUT_QUERY = "@media (max-width: 760px)";
 const DESKTOP_LAYOUT_QUERY = "@media (min-width: 761px)";
 const FACE_LABELS: Record<Face, string> = {
@@ -195,6 +197,127 @@ function faceLabel(face: Face): string {
 
 function formatCustomSpeed(seconds: number): string {
   return `${Number(seconds.toFixed(2))} 秒`;
+}
+
+interface MobileWorkspaceControlsProps {
+  viewControls: ViewControls | null;
+  formula: string[];
+  playbackIndex: number;
+  playing: boolean;
+  speedPreset: SpeedPreset;
+  customSpeedSeconds: number;
+  onCopyFormula: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onTogglePlayback: () => void;
+  onSpeedPresetChange: (preset: SpeedPreset) => void;
+  onCustomSpeedChange: (seconds: number) => void;
+}
+
+function MobileWorkspaceControls({
+  viewControls,
+  formula,
+  playbackIndex,
+  playing,
+  speedPreset,
+  customSpeedSeconds,
+  onCopyFormula,
+  onPrevious,
+  onNext,
+  onTogglePlayback,
+  onSpeedPresetChange,
+  onCustomSpeedChange,
+}: MobileWorkspaceControlsProps) {
+  const quickFaces: CubeFace[] = ["F", "B", "U", "D", "L", "R"];
+  return (
+    <Box
+      className="mobile-workspace-controls"
+      aria-label="移动端工作区控制"
+      sx={{
+        display: "grid",
+        gap: 1,
+        minWidth: 0,
+        p: 1.25,
+        border: "1px solid #263945",
+        borderRadius: 1.5,
+        bgcolor: "#0d171e",
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.75, minWidth: 0 }}>
+        <Typography component="span" sx={{ display: { xs: "none", sm: "inline" }, color: "#8fa7b2", fontSize: ".7rem", fontWeight: 700, whiteSpace: "nowrap" }}>快速对准</Typography>
+        <ButtonGroup variant="outlined" size="small" aria-label="六面快速视角" sx={{ minWidth: 0, flexShrink: 1 }}>
+          {quickFaces.map((face) => (
+            <Button
+              key={face}
+              type="button"
+              onClick={() => viewControls?.face(face)}
+              aria-label={`查看 ${face} 面`}
+              title={`查看 ${face} 面`}
+              sx={{ minWidth: 31, minHeight: 32, px: 0.75, py: 0.5, color: "#d2e0e4", bgcolor: "rgb(12 20 27 / 76%)", borderColor: "#3c5662", fontSize: ".72rem", fontWeight: 760 }}
+            >
+              {face}
+            </Button>
+          ))}
+        </ButtonGroup>
+        <Button type="button" aria-label="重置视角" onClick={() => viewControls?.reset()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".72rem" }}>↻</Button>
+        <Button type="button" aria-label="适应窗口" onClick={() => viewControls?.fit()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".82rem" }}>⛶</Button>
+      </Box>
+
+      {formula.length > 0 && (
+        <Box
+          className="mobile-playback-controls"
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            alignItems: "center",
+            gap: 1,
+            minWidth: 0,
+            pt: 1,
+            borderTop: "1px solid #22313b",
+          }}
+        >
+          <Box className="formula-actions" sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, minWidth: 0 }}>
+            <Button type="button" onClick={onCopyFormula} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>复制公式</Button>
+            <Button type="button" aria-label="上一步" onClick={onPrevious} disabled={playbackIndex < 0} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>← 上一步</Button>
+            <Button type="button" aria-label="下一步" onClick={onNext} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>下一步 →</Button>
+            <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={onTogglePlayback} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>{playing ? "暂停" : "播放"}</Button>
+          </Box>
+          <FormControl className="mobile-speed-select" size="small" sx={{ minWidth: 92, width: 112 }}>
+            <InputLabel id="mobile-speed-select-label">播放速度</InputLabel>
+            <Select
+              labelId="mobile-speed-select-label"
+              id="mobile-speed-select"
+              label="播放速度"
+              aria-label="播放速度"
+              value={speedPreset}
+              onChange={(event) => onSpeedPresetChange(event.target.value as SpeedPreset)}
+              renderValue={(value) => ({ slow: "慢速", standard: "标准", fast: "快速", custom: "自定义" }[value as SpeedPreset])}
+            >
+              <MenuItem value="slow">慢速（1.0 秒/步）</MenuItem>
+              <MenuItem value="standard">标准（0.7 秒/步）</MenuItem>
+              <MenuItem value="fast">快速（0.35 秒/步）</MenuItem>
+              <MenuItem value="custom">自定义</MenuItem>
+            </Select>
+          </FormControl>
+          {speedPreset === "custom" && (
+            <Box className="mobile-custom-speed" sx={{ gridColumn: "1 / -1", display: "grid", gap: 0.375, px: 0.5 }}>
+              <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>每步 {formatCustomSpeed(customSpeedSeconds)}</Typography>
+              <Slider
+                aria-label="移动端自定义每步秒数"
+                value={customSpeedSeconds}
+                min={CUSTOM_SPEED_MIN_SECONDS}
+                max={CUSTOM_SPEED_MAX_SECONDS}
+                step={CUSTOM_SPEED_STEP_SECONDS}
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
+                onChange={(_, value) => onCustomSpeedChange(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 function readStoredCube(key: string): CubeState | null {
@@ -505,6 +628,8 @@ export default function App() {
   const [customSpeedSeconds, setCustomSpeedSeconds] = useState(1);
   const [playbackAnimation, setPlaybackAnimation] = useState<CubeAnimation | null>(null);
   const [pendingOrder, setPendingOrder] = useState<number | null>(null);
+  const [viewportControls, setViewportControls] = useState<ViewControls | null>(null);
+  const mobileLayout = useMediaQuery(MOBILE_MEDIA_QUERY, { noSsr: true });
   const formulaScrollbarEnabled = useMediaQuery(theme.breakpoints.up("sm"), { noSsr: true });
   const cancelledJobIds = useRef(new Set<string>());
   const activeJobRef = useRef<string | null>(null);
@@ -516,6 +641,7 @@ export default function App() {
   const formulaStepRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const formulaListRef = useRef<HTMLOListElement | null>(null);
   const perfectScrollbarRef = useRef<PerfectScrollbar | null>(null);
+  const viewportControlsRef = useRef<ViewControls | null>(null);
   const playbackDelayMs = speedPreset === "custom"
     ? Math.round(customSpeedSeconds * 1000)
     : PRESET_SPEEDS[speedPreset];
@@ -830,6 +956,10 @@ export default function App() {
   const visibleCube = playbackState ?? cube;
   const isBusy = solveStatus !== "idle" && solveStatus !== "completed" && solveStatus !== "failed" && solveStatus !== "cancelled";
   const handleViewChange = useCallback((nextFacing: ViewFacing) => setViewFacing(nextFacing), []);
+  const handleViewControlsReady = useCallback((controls: ViewControls | null) => {
+    viewportControlsRef.current = controls;
+    setViewportControls(controls);
+  }, []);
 
   if (typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "") === "/status") {
     return (
@@ -972,19 +1102,49 @@ export default function App() {
             gap: 2.25,
             pt: { xs: 1.5, sm: 3 },
             [MOBILE_LAYOUT_QUERY]: {
-              gridTemplateColumns: "minmax(0, 1.42fr) minmax(0, .58fr)",
-              gridTemplateAreas: '"control control" "cube solution" "editor editor"',
+              gridTemplateColumns: "minmax(0, 1fr)",
+              gridTemplateAreas: '"mobile-controls" "workspace"',
               columnGap: 0,
-              rowGap: 1.25,
+              rowGap: 1,
               alignItems: "stretch",
             },
             [DESKTOP_LAYOUT_QUERY]: {
               gridTemplateColumns: "minmax(0, 1.35fr) minmax(370px, .82fr)",
-              ...(formula.length > 0 && { alignItems: "stretch", gridTemplateRows: "minmax(0, 1fr)" }),
-              ...(formula.length > 0 && { flex: "1 1 auto", minHeight: 0 }),
+              ...(formula.length > 0 && { alignItems: "stretch", gridTemplateRows: "minmax(0, 1fr)", flex: "1 1 auto", minHeight: 0 }),
             },
           }}
         >
+          {mobileLayout && (
+            <MobileWorkspaceControls
+              viewControls={viewportControls}
+              formula={formula}
+              playbackIndex={playbackIndex}
+              playing={playing}
+              speedPreset={speedPreset}
+              customSpeedSeconds={customSpeedSeconds}
+              onCopyFormula={copyFormula}
+              onPrevious={() => setPlaybackStep(playbackIndex - 1)}
+              onNext={() => setPlaybackStep(playbackIndex + 1)}
+              onTogglePlayback={togglePlayback}
+              onSpeedPresetChange={setSpeedPreset}
+              onCustomSpeedChange={setCustomSpeedSeconds}
+            />
+          )}
+          <Box
+            className="mobile-workspace"
+            sx={{
+              display: "contents",
+              minWidth: 0,
+              [MOBILE_LAYOUT_QUERY]: {
+                display: "grid",
+                gridArea: "workspace",
+                gridTemplateColumns: "minmax(0, 1fr)",
+                gridTemplateAreas: '"cube" "solution" "editor" "control"',
+                gap: 1,
+                minWidth: 0,
+              },
+            }}
+          >
           <Box
             className="left-column"
             sx={{
@@ -1036,6 +1196,7 @@ export default function App() {
                 animation={playbackAnimation}
                 animationDuration={Math.max(240, Math.min(520, playbackDelayMs * 0.72))}
                 onViewChange={handleViewChange}
+                onViewControlsReady={handleViewControlsReady}
               />
               <Box
                 className="view-readout"
@@ -1110,11 +1271,12 @@ export default function App() {
               gridTemplateColumns: "minmax(0, 1fr)",
               gap: 2.25,
               minWidth: 0,
+              minHeight: 0,
               alignItems: "stretch",
               [MOBILE_LAYOUT_QUERY]: { display: "contents" },
               [DESKTOP_LAYOUT_QUERY]: {
                 gridTemplateColumns: "minmax(0, 1fr)",
-                ...(formula.length > 0 && { gridTemplateRows: "minmax(0, 1fr) auto", minHeight: 0 }),
+                ...(formula.length > 0 && { gridTemplateRows: "minmax(0, 1fr) auto", height: "100%", minHeight: 0, overflow: "hidden" }),
               },
             }}
           >
@@ -1131,16 +1293,22 @@ export default function App() {
                 minHeight: 0,
                 p: { xs: 2, sm: 2.625 },
                 overflow: formula.length ? "hidden" : "visible",
-                height: formula.length ? { xs: "min(640px, calc(100svh - 96px))", sm: "min(710px, calc(100vh - 32px))", md: "auto" } : "auto",
+                height: formula.length ? { xs: "min(640px, calc(100svh - 96px))", sm: "auto" } : "auto",
                 maxHeight: formula.length
-                  ? { xs: "min(640px, calc(100svh - 96px))", sm: "min(710px, calc(100vh - 32px))", md: "none" }
-                  : { xs: "none", sm: "710px", md: "min(790px, calc(100vh - 32px))" },
+                  ? { xs: "min(640px, calc(100svh - 96px))", sm: "none" }
+                  : { xs: "none", sm: "none" },
                 [theme.breakpoints.up("sm")]: { overflow: "hidden" },
                 [MOBILE_LAYOUT_QUERY]: {
                   gridArea: "solution",
-                  height: formula.length ? "min(540px, calc(100svh - 190px))" : "auto",
-                  maxHeight: formula.length ? "540px" : "none",
+                  height: formula.length ? "min(460px, calc(100svh - 280px))" : "auto",
+                  maxHeight: formula.length ? "460px" : "none",
                   p: 1.25,
+                },
+                [DESKTOP_LAYOUT_QUERY]: {
+                  height: "auto",
+                  maxHeight: "none",
+                  minHeight: 0,
+                  overflow: "hidden",
                 },
               }}
             >
@@ -1157,35 +1325,27 @@ export default function App() {
               <Box
                 className="formula-toolbar"
                 sx={{
-                  display: "flex",
-                  alignItems: { xs: "stretch", sm: "flex-end" },
-                  justifyContent: "space-between",
-                  flexDirection: { xs: "column", sm: "row" },
-                  flexWrap: "wrap",
+                  display: "grid",
+                  gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) auto" },
+                  alignItems: "start",
                   gap: 1.5,
                   mt: 1,
                   pt: 0.875,
                   pb: 1.25,
                   borderBottom: "1px solid #22313b",
+                  [MOBILE_LAYOUT_QUERY]: { display: "none" },
                 }}
               >
-                <Box className="formula-actions" sx={{ display: "flex", flexWrap: "wrap", gap: 0.875 }}>
-                  <Button type="button" onClick={copyFormula} disabled={!formula.length} sx={{ px: 1.25, fontSize: ".77rem" }}>复制公式</Button>
+                <Box className="formula-actions" sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minWidth: 0 }}>
+                  <Button type="button" onClick={copyFormula} disabled={!formula.length} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>复制公式</Button>
                   {formula.length > 0 && <>
-                    <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ px: 1.25, fontSize: ".77rem" }}>← 上一步</Button>
-                    <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ px: 1.25, fontSize: ".77rem" }}>下一步 →</Button>
-                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ px: 1.25, fontSize: ".77rem" }}>{playing ? "暂停" : "播放"}</Button>
+                    <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>← 上一步</Button>
+                    <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>下一步 →</Button>
+                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
                   </>}
                 </Box>
                 {formula.length > 0 && (
-                  <Box
-                    className="speed-control"
-                    sx={{
-                      flex: speedPreset === "custom" ? { xs: "1 1 100%", sm: "0 1 220px" } : "0 0 90px",
-                      minWidth: speedPreset === "custom" ? { sm: 180 } : 90,
-                    }}
-                  >
-                    <FormControl fullWidth size="small" sx={{ gap: 0.625 }}>
+                  <FormControl className="speed-control" fullWidth size="small" sx={{ gridColumn: { xs: "1", sm: "2" }, width: { xs: "100%", sm: 112 }, minWidth: { sm: 112 } }}>
                     <InputLabel id="speed-select-label">播放速度</InputLabel>
                     <Select
                       labelId="speed-select-label"
@@ -1201,24 +1361,23 @@ export default function App() {
                       <MenuItem value="fast">快速（0.35 秒/步）</MenuItem>
                       <MenuItem value="custom">自定义</MenuItem>
                     </Select>
-                    </FormControl>
-                    {speedPreset === "custom" && (
-                      <Box sx={{ px: 0.75, pt: 1.25 }}>
-                        <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>
-                          每步 {formatCustomSpeed(customSpeedSeconds)}
-                        </Typography>
-                        <Slider
-                          aria-label="自定义每步秒数"
-                          value={customSpeedSeconds}
-                          min={CUSTOM_SPEED_MIN_SECONDS}
-                          max={CUSTOM_SPEED_MAX_SECONDS}
-                          step={CUSTOM_SPEED_STEP_SECONDS}
-                          valueLabelDisplay="auto"
-                          valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
-                          onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
-                        />
-                      </Box>
-                    )}
+                  </FormControl>
+                )}
+                {formula.length > 0 && speedPreset === "custom" && (
+                  <Box className="custom-speed-control" sx={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "center", gap: 1.25, px: 0.75 }}>
+                    <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem", whiteSpace: "nowrap" }}>
+                      每步 {formatCustomSpeed(customSpeedSeconds)}
+                    </Typography>
+                    <Slider
+                      aria-label="自定义每步秒数"
+                      value={customSpeedSeconds}
+                      min={CUSTOM_SPEED_MIN_SECONDS}
+                      max={CUSTOM_SPEED_MAX_SECONDS}
+                      step={CUSTOM_SPEED_STEP_SECONDS}
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
+                      onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
+                    />
                   </Box>
                 )}
               </Box>
@@ -1335,6 +1494,7 @@ export default function App() {
                 </Box>
               )}
             </Paper>
+          </Box>
           </Box>
         </Box>
         <Dialog

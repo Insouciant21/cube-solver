@@ -98,6 +98,16 @@ test("long solution formula stays readable and contained", async ({ page }, test
     expect(panelLayout?.solutionPosition).toBe("static");
     expect(panelLayout?.solutionHeight).toBeLessThanOrEqual(Math.min(790, panelLayout?.viewportHeight ?? 0));
     expect(panelLayout?.gap).toBeGreaterThanOrEqual(0);
+    const verticalContainment = await page.evaluate(() => {
+      const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
+      const control = document.querySelector<HTMLElement>(".control-panel")?.getBoundingClientRect();
+      const steps = document.querySelector<HTMLElement>(".formula-steps")?.getBoundingClientRect();
+      if (!solution || !control || !steps) return null;
+      return { solutionBottom: solution.bottom, controlTop: control.top, stepsBottom: steps.bottom };
+    });
+    expect(verticalContainment).not.toBeNull();
+    expect(verticalContainment?.solutionBottom).toBeLessThanOrEqual((verticalContainment?.controlTop ?? 0) + 1);
+    expect(verticalContainment?.stepsBottom).toBeLessThanOrEqual((verticalContainment?.solutionBottom ?? 0) + 1);
     expect(panelLayout?.cubeLeft).toBeLessThan(panelLayout?.solutionLeft ?? 0);
     expect(panelLayout?.controlLeft).toBeCloseTo(panelLayout?.solutionLeft ?? 0, 0);
     expect(panelLayout?.editorTop).toBeGreaterThanOrEqual((panelLayout?.cubeBottom ?? 0) - 1);
@@ -123,20 +133,60 @@ test("long solution formula stays readable and contained", async ({ page }, test
     });
     expect(scrollbarGeometry).not.toBeNull();
     expect(scrollbarGeometry?.buttonRight).toBeLessThanOrEqual((scrollbarGeometry?.railLeft ?? 0) - 3);
+    await page.getByRole("combobox", { name: "播放速度" }).click();
+    await page.getByRole("option", { name: "自定义" }).click();
+    const customSpeedLayout = await page.evaluate(() => {
+      const toolbar = document.querySelector<HTMLElement>(".formula-toolbar");
+      const actions = document.querySelector<HTMLElement>(".formula-actions");
+      const select = document.querySelector<HTMLElement>(".formula-toolbar .speed-control");
+      const slider = document.querySelector<HTMLElement>(".formula-toolbar .custom-speed-control");
+      if (!toolbar || !actions || !select || !slider) return null;
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      const selectRect = select.getBoundingClientRect();
+      const sliderRect = slider.getBoundingClientRect();
+      return {
+        actionsTop: actionsRect.top,
+        selectTop: selectRect.top,
+        toolbarBottom: toolbarRect.bottom,
+        sliderTop: sliderRect.top,
+      };
+    });
+    expect(customSpeedLayout).not.toBeNull();
+    expect(customSpeedLayout?.selectTop).toBeCloseTo(customSpeedLayout?.actionsTop ?? 0, 0);
+    expect(customSpeedLayout?.sliderTop).toBeGreaterThan(customSpeedLayout?.selectTop ?? 0);
+    expect(customSpeedLayout?.sliderTop).toBeLessThanOrEqual(customSpeedLayout?.toolbarBottom ?? 0);
     for (let index = 0; index < 20; index += 1) {
       await page.getByRole("button", { name: "下一步" }).click();
     }
     await expect(moveList.getByRole("button").nth(19)).toHaveAttribute("aria-current", "step");
     await expect.poll(() => moveList.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-    await expect.poll(() => moveList.evaluate((element) => {
+    const activeVisibility = () => moveList.evaluate((element) => {
       const active = element.querySelector<HTMLElement>('[aria-current="step"]');
-      if (!active) return false;
       const panelRect = element.getBoundingClientRect();
-      const activeRect = active.getBoundingClientRect();
-      return activeRect.top >= panelRect.top - 1 && activeRect.bottom <= panelRect.bottom + 1;
-    })).toBe(true);
+      const activeRect = active?.getBoundingClientRect();
+      return {
+        visible: Boolean(activeRect && activeRect.top >= panelRect.top - 1 && activeRect.bottom <= panelRect.bottom + 1),
+        panelTop: panelRect.top,
+        panelBottom: panelRect.bottom,
+        activeTop: activeRect?.top ?? null,
+        activeBottom: activeRect?.bottom ?? null,
+      };
+    });
+    await expect.poll(activeVisibility).toMatchObject({ visible: true });
   }
   if (testInfo.project.name === "mobile") {
+    await expect(page.locator(".mobile-workspace-controls")).toBeVisible();
+    const mobileWorkspaceOrder = await page.evaluate(() => {
+      const controls = document.querySelector<HTMLElement>(".mobile-workspace-controls")?.getBoundingClientRect();
+      const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
+      const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
+      if (!controls || !cube || !solution) return null;
+      return { controlsBottom: controls.bottom, cubeTop: cube.top, cubeBottom: cube.bottom, solutionTop: solution.top };
+    });
+    expect(mobileWorkspaceOrder).not.toBeNull();
+    expect(mobileWorkspaceOrder?.controlsBottom).toBeLessThanOrEqual((mobileWorkspaceOrder?.cubeTop ?? 0) + 1);
+    expect(mobileWorkspaceOrder?.solutionTop).toBeGreaterThanOrEqual((mobileWorkspaceOrder?.cubeBottom ?? 0) - 1);
     const mobilePanelLayout = await formula.evaluate((element) => {
       const style = getComputedStyle(element);
       return {
@@ -171,25 +221,31 @@ test("mobile keeps the canvas and controls usable", async ({ page }, testInfo) =
 
   if (testInfo.project.name === "mobile") {
     const mobileLayout = await page.evaluate(() => {
+      const workspaceControls = document.querySelector<HTMLElement>(".mobile-workspace-controls")?.getBoundingClientRect();
       const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
       const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
       const control = document.querySelector<HTMLElement>(".control-panel")?.getBoundingClientRect();
       const editor = document.querySelector<HTMLElement>(".editor-bar")?.getBoundingClientRect();
-      if (!cube || !solution || !control || !editor) return null;
+      if (!workspaceControls || !cube || !solution || !control || !editor) return null;
       return {
+        workspaceControlsBottom: workspaceControls.bottom,
         cubeLeft: cube.left,
         solutionLeft: solution.left,
-        middleTop: Math.min(cube.top, solution.top),
-        middleBottom: Math.max(cube.bottom, solution.bottom),
-        controlBottom: control.bottom,
+        cubeTop: cube.top,
+        cubeBottom: cube.bottom,
+        solutionTop: solution.top,
+        solutionBottom: solution.bottom,
+        editorBottom: editor.bottom,
         controlTop: control.top,
         editorTop: editor.top,
       };
     });
     expect(mobileLayout).not.toBeNull();
-    expect(mobileLayout?.cubeLeft).toBeLessThan(mobileLayout?.solutionLeft ?? 0);
-    expect(mobileLayout?.controlBottom).toBeLessThanOrEqual((mobileLayout?.middleTop ?? 0) + 1);
-    expect(mobileLayout?.editorTop).toBeGreaterThanOrEqual((mobileLayout?.middleBottom ?? 0) - 1);
+    expect(mobileLayout?.cubeLeft).toBeCloseTo(mobileLayout?.solutionLeft ?? 0, 0);
+    expect(mobileLayout?.workspaceControlsBottom).toBeLessThanOrEqual((mobileLayout?.cubeTop ?? 0) + 1);
+    expect(mobileLayout?.solutionTop).toBeGreaterThanOrEqual((mobileLayout?.cubeBottom ?? 0) - 1);
+    expect(mobileLayout?.editorTop).toBeGreaterThanOrEqual((mobileLayout?.solutionBottom ?? 0) - 1);
+    expect(mobileLayout?.controlTop).toBeGreaterThanOrEqual((mobileLayout?.editorBottom ?? 0) - 1);
   }
 
   const canvas = page.getByTestId("three-cube-canvas");
@@ -212,13 +268,17 @@ test("3D drag rotates without painting and a click paints", async ({ page }, tes
 
   const canvas = page.getByTestId("three-cube-canvas");
   const toolbar = page.locator(".cube-viewport-toolbar");
-  const toolbarLayout = await Promise.all([
-    toolbar.boundingBox(),
-    canvas.boundingBox(),
-  ]);
-  expect(toolbarLayout[0]).not.toBeNull();
-  expect(toolbarLayout[1]).not.toBeNull();
-  expect(toolbarLayout[1]?.y).toBeGreaterThanOrEqual((toolbarLayout[0]?.y ?? 0) + (toolbarLayout[0]?.height ?? 0) - 1);
+  if (testInfo.project.name === "desktop") {
+    const toolbarLayout = await Promise.all([
+      toolbar.boundingBox(),
+      canvas.boundingBox(),
+    ]);
+    expect(toolbarLayout[0]).not.toBeNull();
+    expect(toolbarLayout[1]).not.toBeNull();
+    expect(toolbarLayout[1]?.y).toBeGreaterThanOrEqual((toolbarLayout[0]?.y ?? 0) + (toolbarLayout[0]?.height ?? 0) - 1);
+  } else {
+    await expect(page.locator(".mobile-workspace-controls")).toBeVisible();
+  }
   await canvas.screenshot({ path: testInfo.outputPath("cube-canvas.png") });
   const pixels = await canvas.evaluate((element) => {
     const source = element as HTMLCanvasElement;
