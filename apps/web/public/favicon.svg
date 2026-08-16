@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">魔方</title>
+  <rect width="64" height="64" rx="14" fill="#0b1116"/>
+
+  <path d="M32 7 56 19 32 31 8 19Z" fill="#f4f7f8" stroke="#1d2931" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M8 19v27l24 12V31Z" fill="#16a085" stroke="#1d2931" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M56 19v27L32 58V31Z" fill="#f05a28" stroke="#1d2931" stroke-width="2" stroke-linejoin="round"/>
+
+  <g fill="none" stroke="#1d2931" stroke-width="1.25" stroke-linecap="round">
+    <path d="m24 11 24 12M16 15l24 12M40 11 16 23M48 15 24 27"/>
+    <path d="m8 28 24 12M8 37l24 12M16 23v27M24 27v27"/>
+    <path d="m56 28-24 12M56 37 32 49M48 23v27M40 27v27"/>
+  </g>
+</svg>
