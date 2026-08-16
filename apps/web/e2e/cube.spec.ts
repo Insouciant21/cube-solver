@@ -58,6 +58,12 @@ test("long solution formula stays readable and contained", async ({ page }, test
   await expect(formula).toContainText("55 步");
   await expect(moveList.getByRole("button")).toHaveCount(55);
   await expect(page.getByRole("combobox", { name: "播放速度" })).toBeVisible();
+  if (testInfo.project.name === "desktop") {
+    const formulaActionWidths = await page.locator(".formula-toolbar .formula-actions button").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().width));
+    expect(formulaActionWidths).toHaveLength(4);
+    expect(Math.min(...formulaActionWidths)).toBeGreaterThan(45);
+    expect(Math.max(...formulaActionWidths) - Math.min(...formulaActionWidths)).toBeLessThanOrEqual(2);
+  }
   const layout = await moveList.evaluate((element) => {
     const firstButton = element.querySelector("button");
     const style = firstButton ? getComputedStyle(firstButton) : null;
@@ -176,7 +182,11 @@ test("long solution formula stays readable and contained", async ({ page }, test
     await expect.poll(activeVisibility).toMatchObject({ visible: true });
   }
   if (testInfo.project.name === "mobile") {
-    await expect(page.locator(".mobile-workspace-controls")).toBeVisible();
+    const mobileControls = page.locator(".mobile-workspace-controls");
+    await expect(mobileControls).toBeVisible();
+    await expect(mobileControls.getByRole("combobox", { name: "魔方阶数" })).toBeVisible();
+    await expect(mobileControls.getByRole("button", { name: "开始求解" })).toBeVisible();
+    await expect(page.locator(".status-actions")).toHaveCSS("display", "none");
     const mobileWorkspaceOrder = await page.evaluate(() => {
       const controls = document.querySelector<HTMLElement>(".mobile-workspace-controls")?.getBoundingClientRect();
       const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
