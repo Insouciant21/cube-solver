@@ -73,22 +73,34 @@ test("long solution formula stays readable and contained", async ({ page }, test
   expect(layout.color).toBe("rgb(220, 230, 235)");
   if (testInfo.project.name === "desktop") {
     const panelLayout = await page.evaluate(() => {
+      const cube = document.querySelector<HTMLElement>(".cube-panel");
       const solution = document.querySelector<HTMLElement>(".solution-panel");
       const control = document.querySelector<HTMLElement>(".control-panel");
-      if (!solution || !control) return null;
+      const editor = document.querySelector<HTMLElement>(".editor-bar");
+      if (!cube || !solution || !control || !editor) return null;
+      const cubeRect = cube.getBoundingClientRect();
       const solutionRect = solution.getBoundingClientRect();
       const controlRect = control.getBoundingClientRect();
+      const editorRect = editor.getBoundingClientRect();
       return {
         solutionPosition: getComputedStyle(solution).position,
         solutionHeight: solution.getBoundingClientRect().height,
         viewportHeight: window.innerHeight,
         gap: controlRect.top - solutionRect.bottom,
+        cubeLeft: cubeRect.left,
+        solutionLeft: solutionRect.left,
+        controlLeft: controlRect.left,
+        editorTop: editorRect.top,
+        cubeBottom: cubeRect.bottom,
       };
     });
     expect(panelLayout).not.toBeNull();
     expect(panelLayout?.solutionPosition).toBe("static");
     expect(panelLayout?.solutionHeight).toBeLessThanOrEqual(Math.min(790, panelLayout?.viewportHeight ?? 0));
     expect(panelLayout?.gap).toBeGreaterThanOrEqual(0);
+    expect(panelLayout?.cubeLeft).toBeLessThan(panelLayout?.solutionLeft ?? 0);
+    expect(panelLayout?.controlLeft).toBeCloseTo(panelLayout?.solutionLeft ?? 0, 0);
+    expect(panelLayout?.editorTop).toBeGreaterThanOrEqual((panelLayout?.cubeBottom ?? 0) - 1);
     const documentLayout = await page.evaluate(() => ({
       documentHeight: document.documentElement.scrollHeight,
       viewportHeight: window.innerHeight,
@@ -148,6 +160,7 @@ test("long solution formula stays readable and contained", async ({ page }, test
     expect(documentScrollAfterFirstStep).toBeGreaterThanOrEqual(documentScrollBeforePlayback);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(documentScrollAfterFirstStep);
     await expect.poll(() => moveList.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect(moveList.locator(".move-explanation").first()).toBeHidden();
   }
   await formula.screenshot({ path: testInfo.outputPath("long-formula.png") });
 });
@@ -161,17 +174,22 @@ test("mobile keeps the canvas and controls usable", async ({ page }, testInfo) =
       const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
       const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
       const control = document.querySelector<HTMLElement>(".control-panel")?.getBoundingClientRect();
-      if (!cube || !solution || !control) return null;
+      const editor = document.querySelector<HTMLElement>(".editor-bar")?.getBoundingClientRect();
+      if (!cube || !solution || !control || !editor) return null;
       return {
         cubeLeft: cube.left,
         solutionLeft: solution.left,
-        firstRowBottom: Math.max(cube.bottom, solution.bottom),
+        middleTop: Math.min(cube.top, solution.top),
+        middleBottom: Math.max(cube.bottom, solution.bottom),
+        controlBottom: control.bottom,
         controlTop: control.top,
+        editorTop: editor.top,
       };
     });
     expect(mobileLayout).not.toBeNull();
     expect(mobileLayout?.cubeLeft).toBeLessThan(mobileLayout?.solutionLeft ?? 0);
-    expect(mobileLayout?.controlTop).toBeGreaterThanOrEqual((mobileLayout?.firstRowBottom ?? 0) - 1);
+    expect(mobileLayout?.controlBottom).toBeLessThanOrEqual((mobileLayout?.middleTop ?? 0) + 1);
+    expect(mobileLayout?.editorTop).toBeGreaterThanOrEqual((mobileLayout?.middleBottom ?? 0) - 1);
   }
 
   const canvas = page.getByTestId("three-cube-canvas");
@@ -193,6 +211,14 @@ test("3D drag rotates without painting and a click paints", async ({ page }, tes
   await page.goto("/");
 
   const canvas = page.getByTestId("three-cube-canvas");
+  const toolbar = page.locator(".cube-viewport-toolbar");
+  const toolbarLayout = await Promise.all([
+    toolbar.boundingBox(),
+    canvas.boundingBox(),
+  ]);
+  expect(toolbarLayout[0]).not.toBeNull();
+  expect(toolbarLayout[1]).not.toBeNull();
+  expect(toolbarLayout[1]?.y).toBeGreaterThanOrEqual((toolbarLayout[0]?.y ?? 0) + (toolbarLayout[0]?.height ?? 0) - 1);
   await canvas.screenshot({ path: testInfo.outputPath("cube-canvas.png") });
   const pixels = await canvas.evaluate((element) => {
     const source = element as HTMLCanvasElement;

@@ -586,27 +586,21 @@ export default function CubeViewport({
   return (
     <Box
       className="cube-viewport-shell"
-      sx={{ position: 'relative', width: '100%', minHeight: '27rem', touchAction: 'none' }}
+      sx={{ width: '100%' }}
     >
       <Box
         className="cube-viewport-toolbar"
         aria-label="3D 视角控制"
         sx={{
-          position: 'absolute',
-          top: 1.5,
-          right: 1.5,
-          left: 1.5,
-          zIndex: 4,
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: { xs: 0.75, sm: 1.25 },
           p: { xs: 0.5, sm: 0.75 },
-          border: 'none',
-          borderRadius: 1.5,
-          bgcolor: 'rgb(10 19 26 / 84%)',
-          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid #263945',
+          bgcolor: '#0d171e',
           boxShadow: 'none',
         }}
       >
@@ -692,16 +686,18 @@ export default function CubeViewport({
           </Button>
         </Box>
       </Box>
-      <canvas
-        ref={canvasRef}
-        aria-label={onStickerClick ? '3D 魔方编辑器。点击贴纸修改颜色，拖动旋转视角。' : '3D 魔方预览。拖动旋转视角。'}
-        data-testid="three-cube-canvas"
-        role="img"
-        style={{ ...canvasStyle, touchAction: 'none', cursor: onStickerClick ? 'crosshair' : 'grab' }}
-      />
-      <Typography component="p" className="cube-gesture-hint" sx={{ position: 'absolute', right: 1.625, bottom: 1, left: 1.625, zIndex: 2, m: 0, color: '#9db0b9', fontSize: '.72rem', pointerEvents: 'none', textAlign: 'center', textShadow: '0 1px 2px #000' }}>
-        拖动旋转 · 滚轮或双指缩放 · 点击贴纸编辑颜色
-      </Typography>
+      <Box className="cube-viewport-stage" sx={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        <canvas
+          ref={canvasRef}
+          aria-label={onStickerClick ? '3D 魔方编辑器。点击贴纸修改颜色，拖动旋转视角。' : '3D 魔方预览。拖动旋转视角。'}
+          data-testid="three-cube-canvas"
+          role="img"
+          style={{ ...canvasStyle, touchAction: 'none', cursor: onStickerClick ? 'crosshair' : 'grab' }}
+        />
+        <Typography component="p" className="cube-gesture-hint" sx={{ position: 'absolute', right: 1.625, bottom: 1, left: 1.625, zIndex: 2, m: 0, color: '#9db0b9', fontSize: '.72rem', pointerEvents: 'none', textAlign: 'center', textShadow: '0 1px 2px #000' }}>
+          拖动旋转 · 滚轮或双指缩放 · 点击贴纸编辑颜色
+        </Typography>
+      </Box>
     </Box>
   );
 }
