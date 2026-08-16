@@ -27,6 +27,8 @@ describe('CubeViewport', () => {
     expect(screen.getByLabelText('3D 魔方预览。拖动旋转视角。')).toBeTruthy();
     expect(screen.getByRole('button', { name: '重置视角' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '适应窗口' })).toBeTruthy();
+    expect(container.querySelector('.cube-viewport-toolbar')?.contains(container.querySelector('canvas'))).toBe(false);
+    expect(container.querySelector('.cube-viewport-toolbar')?.nextElementSibling).toHaveClass('cube-viewport-stage');
   });
 
   it('uses the same orange and red indices as CubeState', () => {

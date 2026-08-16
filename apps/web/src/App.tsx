@@ -121,6 +121,8 @@ const theme = createTheme({
 
 const ORDERS = [2, 3, 4, 5, 6, 7] as const;
 const COLORS = ["白", "黄", "绿", "蓝", "橙", "红"] as const;
+const MOBILE_LAYOUT_QUERY = "@media (max-width: 760px)";
+const DESKTOP_LAYOUT_QUERY = "@media (min-width: 761px)";
 const FACE_LABELS: Record<Face, string> = {
   U: "U（上）",
   D: "D（下）",
@@ -851,7 +853,7 @@ export default function App() {
           pt: { xs: 2.375, sm: 3.5 },
           pb: { xs: 3.75, sm: 5.25 },
           ...(formula.length > 0 && {
-            [theme.breakpoints.up("md")]: {
+            [DESKTOP_LAYOUT_QUERY]: {
               display: "flex",
               minHeight: 0,
               height: "100vh",
@@ -965,22 +967,45 @@ export default function App() {
           className={`workbench${formula.length ? " has-formula" : ""}`}
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "minmax(0, 1fr) minmax(0, 1fr)", md: "minmax(0, 1.35fr) minmax(370px, .82fr)" },
+            gridTemplateColumns: "minmax(0, 1fr)",
             alignItems: "start",
-            gap: { xs: 1.25, md: 2.25 },
+            gap: 2.25,
             pt: { xs: 1.5, sm: 3 },
-            [theme.breakpoints.up("md")]: {
+            [MOBILE_LAYOUT_QUERY]: {
+              gridTemplateColumns: "minmax(0, 1.42fr) minmax(0, .58fr)",
+              gridTemplateAreas: '"control control" "cube solution" "editor editor"',
+              columnGap: 0,
+              rowGap: 1.25,
+              alignItems: "stretch",
+            },
+            [DESKTOP_LAYOUT_QUERY]: {
               gridTemplateColumns: "minmax(0, 1.35fr) minmax(370px, .82fr)",
               ...(formula.length > 0 && { alignItems: "stretch", gridTemplateRows: "minmax(0, 1fr)" }),
               ...(formula.length > 0 && { flex: "1 1 auto", minHeight: 0 }),
             },
           }}
         >
+          <Box
+            className="left-column"
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr)",
+              gap: 2.25,
+              minWidth: 0,
+              alignContent: "start",
+              [MOBILE_LAYOUT_QUERY]: { display: "contents" },
+            }}
+          >
           <Paper
             component="section"
             className="panel cube-panel"
             aria-labelledby="cube-panel-title"
-            sx={{ minWidth: 0, alignSelf: "start", p: { xs: 2, sm: 3.375 } }}
+            sx={{
+              minWidth: 0,
+              alignSelf: "start",
+              p: { xs: 1.5, sm: 3.375 },
+              [MOBILE_LAYOUT_QUERY]: { gridArea: "cube" },
+            }}
           >
             <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
               <Box>
@@ -1023,70 +1048,72 @@ export default function App() {
               </Box>
             </Box>
 
-            <Box
-              className="editor-bar"
-              sx={{
-                display: "flex",
-                alignItems: { xs: "stretch", sm: "flex-end" },
-                justifyContent: "space-between",
-                flexDirection: { xs: "column", sm: "row" },
-                gap: 2.25,
-                mt: 1.875,
-                pt: 1.875,
-              }}
-            >
-              <Box>
-                <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
-                  3D 编辑
-                </Typography>
-                <Typography component="p" sx={{ maxWidth: "32rem", m: 0, color: "text.secondary", fontSize: ".78rem", lineHeight: 1.5 }}>
-                  选择颜色后点击模型上的贴纸；拖动模型可自由旋转视角。
-                </Typography>
-              </Box>
-              <Box className="editor-tools" aria-label="3D 贴纸颜色" sx={{ display: "flex", flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" }, gap: 0.875 }}>
-                {COLORS.map((color, index) => (
-                  <Button
-                    key={color}
-                    variant="contained"
-                    color="inherit"
-                    type="button"
-                    aria-label={`选择${color}色`}
-                    aria-pressed={selectedColor === index}
-                    data-color={index}
-                    onClick={() => setSelectedColor(index)}
-                    sx={{
-                      minWidth: 37,
-                      minHeight: 37,
-                      px: 1.125,
-                      py: 0.625,
-                      color: "#0b1216",
-                      bgcolor: STICKER_COLORS[index],
-                      border: "2px solid rgb(255 255 255 / 24%)",
-                      textShadow: "0 1px rgb(255 255 255 / 22%)",
-                      "&:hover": { bgcolor: STICKER_COLORS[index], filter: "brightness(1.1)" },
-                      "&[aria-pressed=\"true\"]": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgb(102 217 193 / 20%)" },
-                    }}
-                  >
-                    {color}
-                  </Button>
-                ))}
-              </Box>
-            </Box>
           </Paper>
+
+          <Box
+            className="editor-bar"
+            sx={{
+              display: "flex",
+              alignItems: { xs: "stretch", sm: "flex-end" },
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2.25,
+              mt: 0,
+              pt: 1.875,
+              [MOBILE_LAYOUT_QUERY]: { gridArea: "editor", px: 1.5, pt: 1.25, pb: 0.5 },
+            }}
+          >
+            <Box className="editor-copy" sx={{ [MOBILE_LAYOUT_QUERY]: { display: "none" } }}>
+              <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
+                3D 编辑
+              </Typography>
+              <Typography component="p" sx={{ maxWidth: "32rem", m: 0, color: "text.secondary", fontSize: ".78rem", lineHeight: 1.5 }}>
+                选择颜色后点击模型上的贴纸；拖动模型可自由旋转视角。
+              </Typography>
+            </Box>
+            <Box className="editor-tools" aria-label="3D 贴纸颜色" sx={{ display: "flex", flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" }, gap: 0.875 }}>
+              {COLORS.map((color, index) => (
+                <Button
+                  key={color}
+                  variant="contained"
+                  color="inherit"
+                  type="button"
+                  aria-label={`选择${color}色`}
+                  aria-pressed={selectedColor === index}
+                  data-color={index}
+                  onClick={() => setSelectedColor(index)}
+                  sx={{
+                    minWidth: 37,
+                    minHeight: 37,
+                    px: 1.125,
+                    py: 0.625,
+                    color: "#0b1216",
+                    bgcolor: STICKER_COLORS[index],
+                    border: "2px solid rgb(255 255 255 / 24%)",
+                    textShadow: "0 1px rgb(255 255 255 / 22%)",
+                    "&:hover": { bgcolor: STICKER_COLORS[index], filter: "brightness(1.1)" },
+                    "&[aria-pressed=\"true\"]": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgb(102 217 193 / 20%)" },
+                  }}
+                >
+                  {color}
+                </Button>
+              ))}
+            </Box>
+          </Box>
+          </Box>
 
           <Box
             component="aside"
             className="side-column"
             sx={{
-              display: { xs: "contents", md: "grid" },
+              display: "grid",
               gridTemplateColumns: "minmax(0, 1fr)",
               gap: 2.25,
               minWidth: 0,
               alignItems: "stretch",
-              [theme.breakpoints.up("sm")]: { gridTemplateColumns: "minmax(0, 1.08fr) minmax(320px, .92fr)", alignItems: "start" },
-              [theme.breakpoints.up("md")]: {
+              [MOBILE_LAYOUT_QUERY]: { display: "contents" },
+              [DESKTOP_LAYOUT_QUERY]: {
                 gridTemplateColumns: "minmax(0, 1fr)",
-                alignItems: "stretch",
                 ...(formula.length > 0 && { gridTemplateRows: "minmax(0, 1fr) auto", minHeight: 0 }),
               },
             }}
@@ -1109,6 +1136,12 @@ export default function App() {
                   ? { xs: "min(640px, calc(100svh - 96px))", sm: "min(710px, calc(100vh - 32px))", md: "none" }
                   : { xs: "none", sm: "710px", md: "min(790px, calc(100vh - 32px))" },
                 [theme.breakpoints.up("sm")]: { overflow: "hidden" },
+                [MOBILE_LAYOUT_QUERY]: {
+                  gridArea: "solution",
+                  height: formula.length ? "min(540px, calc(100svh - 190px))" : "auto",
+                  maxHeight: formula.length ? "540px" : "none",
+                  p: 1.25,
+                },
               }}
             >
               <Box className="solution-heading" sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1.875 }}>
@@ -1199,7 +1232,7 @@ export default function App() {
                   data-scrollbar={formulaScrollbarEnabled ? "perfect" : "native"}
                   sx={{
                     display: "grid",
-                    flex: "1 1 auto",
+                    flex: "1 1 0",
                     gridTemplateColumns: "minmax(0, 1fr)",
                     alignContent: "start",
                     gap: 0.875,
@@ -1244,12 +1277,12 @@ export default function App() {
                           "&:hover": { backgroundColor: "#17232c", borderColor: "#3b5361" },
                           "&[aria-current=\"step\"]": { color: "#f5ffff", backgroundColor: "#16332f", borderColor: "#66d9c1", boxShadow: "inset 3px 0 0 #66d9c1" },
                           "&[data-played=\"true\"]": { borderColor: "#36544f", opacity: 0.72 },
-                          "@media (max-width: 460px)": { gridTemplateColumns: "27px 38px minmax(0, 1fr)", gap: 0.875, px: 0.875 },
+                          [MOBILE_LAYOUT_QUERY]: { gridTemplateColumns: "25px minmax(0, 1fr)", gap: 0.625, px: 0.625 },
                         }}
                       >
                         <Box component="span" className="move-number" sx={{ display: "grid", width: 27, height: 27, placeItems: "center", color: "#78909d", bgcolor: "#0b1116", borderRadius: "50%", fontSize: ".68rem", fontVariantNumeric: "tabular-nums" }}>{moveIndex + 1}</Box>
                         <Box component="span" className="move-token" sx={{ color: "#8fe0d0", fontSize: ".91rem", fontWeight: 800 }}>{token}</Box>
-                        <Box component="span" className="move-explanation" sx={{ minWidth: 0, overflowWrap: "anywhere", color: "#aebdc5", fontSize: ".75rem", lineHeight: 1.35 }}>{explainMove(token)}</Box>
+                        <Box component="span" className="move-explanation" sx={{ minWidth: 0, overflowWrap: "anywhere", color: "#aebdc5", fontSize: ".75rem", lineHeight: 1.35, [MOBILE_LAYOUT_QUERY]: { display: "none" } }}>{explainMove(token)}</Box>
                       </Button>
                     </Box>
                   ))}
@@ -1257,7 +1290,7 @@ export default function App() {
               )}
             </Paper>
 
-            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 }, gridColumn: { xs: "1 / -1", md: "auto" } }}>
+            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 }, [MOBILE_LAYOUT_QUERY]: { gridArea: "control" } }}>
               <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
                 <Box>
                   <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>

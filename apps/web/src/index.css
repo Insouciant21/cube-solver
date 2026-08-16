@@ -34,14 +34,18 @@ select {
 }
 
 .cube-viewport-shell {
+  width: 100%;
+}
+
+.cube-viewport-stage {
+  height: 27rem;
   min-height: 27rem;
 }
 
-.cube-viewport-shell canvas {
+.cube-viewport-stage canvas {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 27rem;
 }
 
 .formula-steps.ps {
@@ -76,8 +80,8 @@ select {
 }
 
 @media (max-width: 760px) {
-  .cube-viewport-shell,
-  .cube-viewport-shell canvas {
+  .cube-viewport-stage {
+    height: 23rem;
     min-height: 23rem;
   }
 }
