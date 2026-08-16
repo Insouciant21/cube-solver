@@ -4,8 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { createCubeState } from "./cube/state";
 
+function chooseSelect(label: string, option: string) {
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: label }));
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+
 afterEach(() => {
   cleanup();
+  window.history.replaceState({}, "", "/");
   Object.defineProperty(window, "localStorage", {
     configurable: true,
     value: undefined,
@@ -20,7 +26,7 @@ describe("App", () => {
     expect(screen.queryByRole("heading", { name: "613 魔方求解器" })).not.toBeInTheDocument();
     expect(screen.queryByText("本地验证状态，生成可回放的 NxNxN 还原公式。")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveValue("3");
+    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveTextContent("3×3");
     expect(screen.getByRole("img", { name: "3D 魔方编辑器。点击贴纸修改颜色，拖动旋转视角。" })).toBeInTheDocument();
     expect(screen.queryByText("Sticker palette")).not.toBeInTheDocument();
   });
@@ -55,29 +61,30 @@ describe("App", () => {
   it("switches cube order and keeps color editing in the 3D toolbar", () => {
     render(<App />);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "魔方阶数" }), {
-      target: { value: "2" },
-    });
-    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveValue("2");
+    chooseSelect("魔方阶数", "2×2");
+    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveTextContent("2×2");
 
     fireEvent.click(screen.getByRole("button", { name: "选择红色" }));
 
     expect(screen.getByRole("button", { name: "选择红色" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("confirms before replacing an edited cube with another order", () => {
-    const confirm = vi.fn().mockReturnValue(false);
-    vi.stubGlobal("confirm", confirm);
+  it("confirms before replacing an edited cube with another order", async () => {
     render(<App />);
 
     fireEvent.change(screen.getByRole("textbox", { name: "移动记号" }), { target: { value: "R" } });
     fireEvent.click(screen.getByRole("button", { name: "执行移动" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "魔方阶数" }), {
-      target: { value: "2" },
-    });
+    chooseSelect("魔方阶数", "2×2");
 
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveValue("3");
+    expect(screen.getByRole("dialog")).toHaveTextContent("切换阶数会替换当前魔方");
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveTextContent("3×3");
+
+    chooseSelect("魔方阶数", "2×2");
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveTextContent("2×2");
   });
 
   it("applies a move and supports undo, redo, and reset", () => {
@@ -160,7 +167,7 @@ describe("App", () => {
     window.localStorage.removeItem("613-cube-state-v1-3");
   });
 
-  it("explains formula moves and supports playback navigation and copy", async () => {
+it("explains formula moves and supports playback navigation and copy", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -272,6 +279,58 @@ it("replays a formula move into a separate playback state", async () => {
   expect(screen.getByRole("button", { name: "第 1 步 R" })).toHaveAttribute(
     "aria-current",
     "step",
+  );
+  vi.unstubAllGlobals();
+});
+
+it("supports custom playback speed and pauses after the final step", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ job_id: "job-speed", revision: 0 }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      text: async () => 'event: completed\ndata: {"moves":["R","U"],"verified":true}\n\n',
+    });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "开始求解" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "播放公式" })).toBeInTheDocument());
+
+  chooseSelect("播放速度", "自定义");
+  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuenow", "1");
+  fireEvent.click(screen.getByRole("button", { name: "播放公式" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "播放公式" })).toBeInTheDocument(), { timeout: 3500 });
+  expect(screen.getByRole("button", { name: "第 2 步 U" })).toHaveAttribute("aria-current", "step");
+  vi.unstubAllGlobals();
+});
+
+it("loads the authenticated backend status page", async () => {
+  window.history.pushState({}, "", "/status");
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      status: "ok",
+      generated_at: "2026-08-17T00:00:00Z",
+      solver: { registered: true, active_job_id: null, queue_length: 0 },
+      active: null,
+      queue: [],
+      jobs: { total: 0, queued: 0, running: 0, completed: 0, failed: 0, cancelled: 0 },
+    }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("状态访问令牌"), { target: { value: "status-token" } });
+  fireEvent.click(screen.getByRole("button", { name: "连接状态" }));
+
+  await waitFor(() => expect(screen.getByText("当前没有排队任务")).toBeInTheDocument());
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/status",
+    { headers: { Authorization: "Bearer status-token" } },
   );
   vi.unstubAllGlobals();
 });

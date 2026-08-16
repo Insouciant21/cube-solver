@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import multiprocessing
 import os
@@ -11,12 +12,13 @@ import time
 from collections import deque
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from queue import Empty
 from typing import Any, cast
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -372,6 +374,10 @@ class _JobStore:
         with self._lock:
             self._jobs.pop(job.job_id, None)
 
+    def all(self) -> list[Job]:
+        with self._lock:
+            return list(self._jobs.values())
+
 
 jobs: _JobStore = _JobStore()
 
@@ -379,6 +385,7 @@ _solver: Solver | None = None
 _solver_lock = threading.Lock()
 _solver_queue: deque[str] = deque()
 _solver_queue_active = False
+_solver_active_job_id: str | None = None
 _solver_queue_condition = threading.Condition()
 
 
@@ -389,7 +396,7 @@ def _enqueue_solver(job_id: str) -> None:
 
 
 def _acquire_solver_turn(job: Job) -> None:
-    global _solver_queue_active
+    global _solver_active_job_id, _solver_queue_active
     with _solver_queue_condition:
         while True:
             if job.cancelled.is_set() or job.done:
@@ -406,14 +413,16 @@ def _acquire_solver_turn(job: Job) -> None:
             ):
                 _solver_queue.popleft()
                 _solver_queue_active = True
+                _solver_active_job_id = job.job_id
                 return
             _solver_queue_condition.wait(timeout=0.05)
 
 
 def _release_solver_turn() -> None:
-    global _solver_queue_active
+    global _solver_active_job_id, _solver_queue_active
     with _solver_queue_condition:
         _solver_queue_active = False
+        _solver_active_job_id = None
         _solver_queue_condition.notify_all()
 
 
@@ -446,6 +455,87 @@ def create_app(solver: Solver | None = None) -> FastAPI:
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def _require_status_token(authorization: str | None) -> None:
+    configured = os.environ.get("CUBE_STATUS_TOKEN", "").strip()
+    if not configured:
+        raise HTTPException(
+            status_code=503,
+            detail="Status authentication is not configured",
+        )
+    scheme, separator, supplied = (authorization or "").partition(" ")
+    if (
+        separator != " "
+        or scheme.lower() != "bearer"
+        or not hmac.compare_digest(supplied.strip(), configured)
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid status credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def _status_job(job: Job, position: int | None = None) -> dict[str, Any]:
+    with job.condition:
+        phase = job.events[-1][0] if job.events else "queued"
+        done = job.done
+    result: dict[str, Any] = {
+        "job_id": job.job_id,
+        "order": job.request.order,
+        "revision": job.request.revision,
+        "phase": phase,
+        "done": done,
+    }
+    if position is not None:
+        result["position"] = position
+    return result
+
+
+@app.get("/api/status")
+async def status(authorization: str | None = Header(default=None)) -> JSONResponse:
+    _require_status_token(authorization)
+    with _solver_queue_condition:
+        queued_ids = list(_solver_queue)
+        active_job_id = _solver_active_job_id
+
+    queued: list[dict[str, Any]] = []
+    for position, job_id in enumerate(queued_ids, start=1):
+        job = jobs.get(job_id)
+        if job is not None:
+            queued.append(_status_job(job, position))
+
+    active_job = jobs.get(active_job_id) if active_job_id else None
+    all_jobs = jobs.all()
+    counts = {
+        "total": len(all_jobs),
+        "queued": len(queued),
+        "running": 1 if active_job is not None else 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+    }
+    for job in all_jobs:
+        phase = _status_job(job)["phase"]
+        if phase in ("completed", "failed", "cancelled"):
+            counts[phase] += 1
+
+    return JSONResponse(
+        content={
+            "status": "ok",
+            "generated_at": datetime.now(UTC).isoformat(),
+            "solver": {
+                "registered": _solver is not None,
+                "active_job_id": active_job_id,
+                "queue_length": len(queued),
+            },
+            "active": _status_job(active_job) if active_job is not None else None,
+            "queue": queued,
+            "jobs": counts,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/api/validate")

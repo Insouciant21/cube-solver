@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
   CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   InputLabel,
+  MenuItem,
   Paper,
   Select,
+  Slider,
   Stack,
   TextField,
   ThemeProvider,
@@ -127,6 +135,34 @@ const DEFAULT_TOP: Face = "U";
 type SolveStatus = "idle" | "queued" | "running" | "downloading" | "reducing" | "solving" | "searching" | "verifying" | "completed" | "failed" | "cancelled";
 type SolveEvent = { name: string; data: Record<string, unknown> };
 type ValidationError = { code?: unknown; message?: unknown };
+type SpeedPreset = "slow" | "standard" | "fast" | "custom";
+type StatusJob = {
+  job_id: string;
+  order: number;
+  revision: number;
+  phase: string;
+  done: boolean;
+  position?: number;
+};
+type BackendStatus = {
+  status: string;
+  generated_at: string;
+  solver: {
+    registered: boolean;
+    active_job_id: string | null;
+    queue_length: number;
+  };
+  active: StatusJob | null;
+  queue: StatusJob[];
+  jobs: {
+    total: number;
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+  };
+};
 
 const STATUS_LABELS: Record<SolveStatus, string> = {
   idle: "待命",
@@ -140,6 +176,15 @@ const STATUS_LABELS: Record<SolveStatus, string> = {
   completed: "已完成",
   failed: "失败",
   cancelled: "已取消",
+};
+const STATUS_TOKEN_STORAGE_KEY = "613-cube-status-token";
+const CUSTOM_SPEED_MIN_SECONDS = 0.1;
+const CUSTOM_SPEED_MAX_SECONDS = 5;
+const CUSTOM_SPEED_STEP_SECONDS = 0.1;
+const PRESET_SPEEDS: Record<Exclude<SpeedPreset, "custom">, number> = {
+  slow: 1000,
+  standard: 700,
+  fast: 350,
 };
 
 function faceLabel(face: Face): string {
@@ -248,6 +293,192 @@ function inverseMove(move: string): string {
   }
 }
 
+function readStatusToken(): string {
+  try {
+    return window.sessionStorage?.getItem(STATUS_TOKEN_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function formatStatusTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function statusPhaseLabel(phase: string): string {
+  return STATUS_LABELS[phase as SolveStatus] ?? phase;
+}
+
+function StatusPage() {
+  const [statusToken, setStatusToken] = useState(readStatusToken);
+  const [draftToken, setDraftToken] = useState(statusToken);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
+  const [statusError, setStatusError] = useState("");
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  const loadStatus = useCallback(async (candidate: string) => {
+    setStatusLoading(true);
+    try {
+      const response = await fetch("/api/status", {
+        headers: { Authorization: `Bearer ${candidate}` },
+      });
+      const body = (await response.json().catch(() => ({}))) as Partial<BackendStatus> & { detail?: unknown };
+      if (!response.ok) {
+        if (response.status === 401) {
+          try {
+            window.sessionStorage?.removeItem(STATUS_TOKEN_STORAGE_KEY);
+          } catch {
+            // Ignore unavailable session storage.
+          }
+          setStatusToken("");
+          setBackendStatus(null);
+        }
+        throw new Error(String(body.detail ?? "状态请求失败"));
+      }
+      setBackendStatus(body as BackendStatus);
+      setStatusError("");
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "状态请求失败");
+    } finally {
+      setStatusLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!statusToken) return undefined;
+    const initialLoad = window.setTimeout(() => void loadStatus(statusToken), 0);
+    const timer = window.setInterval(() => void loadStatus(statusToken), 3000);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(timer);
+    };
+  }, [loadStatus, statusToken]);
+
+  const connect = () => {
+    const candidate = draftToken.trim();
+    if (!candidate) {
+      setStatusError("请输入状态访问令牌");
+      return;
+    }
+    try {
+      window.sessionStorage?.setItem(STATUS_TOKEN_STORAGE_KEY, candidate);
+    } catch {
+      // Continue with the in-memory token when storage is unavailable.
+    }
+    setBackendStatus(null);
+    setStatusError("");
+    setStatusToken(candidate);
+  };
+
+  const disconnect = () => {
+    try {
+      window.sessionStorage?.removeItem(STATUS_TOKEN_STORAGE_KEY);
+    } catch {
+      // Ignore unavailable session storage.
+    }
+    setStatusToken("");
+    setBackendStatus(null);
+    setStatusError("");
+  };
+
+  return (
+    <Box
+      component="main"
+      sx={{
+        width: "min(1100px, 100%)",
+        mx: "auto",
+        px: { xs: 1.5, sm: "clamp(14px, 4vw, 58px)" },
+        pt: { xs: 2.375, sm: 3.5 },
+        pb: { xs: 3.75, sm: 5.25 },
+      }}
+    >
+      <Box component="header" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mb: 2.5 }}>
+        <Typography component="p" className="eyebrow" variant="overline" sx={{ m: 0, color: "#7893a2", fontSize: ".67rem", fontWeight: 750, letterSpacing: ".14em" }}>
+          613 CODING · 魔方公式工作台
+        </Typography>
+        <Button component="a" href="/" size="small" sx={{ flexShrink: 0 }}>返回工作台</Button>
+      </Box>
+
+      <Paper component="section" aria-labelledby="status-page-title" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em" }}>
+          系统监控
+        </Typography>
+        <Typography id="status-page-title" component="h1" variant="h2" sx={{ fontSize: "1.35rem", mb: 0.75 }}>后端状态</Typography>
+        <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".8rem" }}>
+          查看求解器注册状态、当前任务和 FIFO 排队情况。状态接口需要 Bearer 令牌。
+        </Typography>
+
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2.5 }}>
+          <TextField
+            fullWidth
+            size="small"
+            type="password"
+            label="状态访问令牌"
+            value={draftToken}
+            onChange={(event) => setDraftToken(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") connect(); }}
+          />
+          <Button variant="contained" color="primary" onClick={connect} disabled={!draftToken.trim() || statusLoading} sx={{ flexShrink: 0, color: "primary.contrastText" }}>
+            {statusLoading && !backendStatus ? "连接中…" : "连接状态"}
+          </Button>
+          {statusToken && <Button onClick={disconnect} sx={{ flexShrink: 0 }}>退出授权</Button>}
+        </Stack>
+
+        {statusError && <Alert severity="error" sx={{ mt: 2 }}>{statusError}</Alert>}
+
+        {backendStatus && (
+          <Box sx={{ mt: 3 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap sx={{ flexWrap: "wrap" }} aria-label="后端状态摘要">
+              {[
+                ["排队中", backendStatus.jobs.queued],
+                ["运行中", backendStatus.jobs.running],
+                ["已完成", backendStatus.jobs.completed],
+                ["失败", backendStatus.jobs.failed],
+                ["已取消", backendStatus.jobs.cancelled],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ flex: "1 1 110px", p: 1.25, border: "1px solid #263945", borderRadius: 1, bgcolor: "#0d171e" }}>
+                  <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".7rem" }}>{label}</Typography>
+                  <Typography component="p" sx={{ m: 0.25, color: "primary.main", fontSize: "1.25rem", fontVariantNumeric: "tabular-nums", fontWeight: 750 }}>{value}</Typography>
+                </Box>
+              ))}
+            </Stack>
+
+            <Box sx={{ mt: 2, p: 1.5, border: "1px solid #263945", borderRadius: 1, bgcolor: "#0d171e" }}>
+              <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".75rem" }}>
+                求解器：{backendStatus.solver.registered ? "已注册" : "未注册"} · 队列长度：{backendStatus.solver.queue_length} · 更新于 {formatStatusTime(backendStatus.generated_at)}
+              </Typography>
+              {backendStatus.active ? (
+                <Typography component="p" sx={{ m: "0.625rem 0 0", color: "#dce6eb", fontSize: ".8rem" }}>
+                  当前任务：{backendStatus.active.job_id} · {backendStatus.active.order}×{backendStatus.active.order} · {statusPhaseLabel(backendStatus.active.phase)}
+                </Typography>
+              ) : (
+                <Typography component="p" sx={{ m: "0.625rem 0 0", color: "text.secondary", fontSize: ".8rem" }}>当前没有运行中的任务</Typography>
+              )}
+            </Box>
+
+            <Box sx={{ mt: 2 }}>
+              <Typography component="h2" variant="h3" sx={{ mb: 1 }}>等待队列</Typography>
+              {backendStatus.queue.length === 0 ? (
+                <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".8rem" }}>当前没有排队任务</Typography>
+              ) : (
+                <Stack spacing={0.875}>
+                  {backendStatus.queue.map((job) => (
+                    <Box key={job.job_id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, p: 1.25, border: "1px solid #263945", borderRadius: 1, bgcolor: "#111a21" }}>
+                      <Typography component="span" sx={{ color: "primary.main", fontSize: ".8rem", fontVariantNumeric: "tabular-nums" }}>#{job.position} · {job.job_id}</Typography>
+                      <Typography component="span" sx={{ color: "text.secondary", fontSize: ".76rem", whiteSpace: "nowrap" }}>{job.order}×{job.order} · {statusPhaseLabel(job.phase)}</Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          </Box>
+        )}
+      </Paper>
+    </Box>
+  );
+}
+
 export default function App() {
   const [cube, setCube] = useState<CubeState>(loadCube);
   const [order, setOrder] = useState(() => cube.order);
@@ -264,8 +495,10 @@ export default function App() {
   const [playbackIndex, setPlaybackIndex] = useState(-1);
   const [playbackState, setPlaybackState] = useState<CubeState | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(700);
+  const [speedPreset, setSpeedPreset] = useState<SpeedPreset>("standard");
+  const [customSpeedSeconds, setCustomSpeedSeconds] = useState(1);
   const [playbackAnimation, setPlaybackAnimation] = useState<CubeAnimation | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<number | null>(null);
   const formulaScrollbarEnabled = useMediaQuery(theme.breakpoints.up("sm"), { noSsr: true });
   const cancelledJobIds = useRef(new Set<string>());
   const activeJobRef = useRef<string | null>(null);
@@ -277,6 +510,9 @@ export default function App() {
   const formulaStepRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const formulaListRef = useRef<HTMLOListElement | null>(null);
   const perfectScrollbarRef = useRef<PerfectScrollbar | null>(null);
+  const playbackDelayMs = speedPreset === "custom"
+    ? Math.round(customSpeedSeconds * 1000)
+    : PRESET_SPEEDS[speedPreset];
 
   useEffect(() => {
     try {
@@ -316,26 +552,27 @@ export default function App() {
     const list = formulaListRef.current;
     const step = formulaStepRefs.current[playbackIndex];
     if (!list || !step) return;
-    if (list.scrollHeight > list.clientHeight) {
-      const listRect = list.getBoundingClientRect();
-      const stepRect = step.getBoundingClientRect();
-      const delta = stepRect.top < listRect.top
-        ? stepRect.top - listRect.top
-        : stepRect.bottom > listRect.bottom
-          ? stepRect.bottom - listRect.bottom
-          : 0;
-      if (delta && typeof list.scrollBy === "function") {
-        list.scrollBy({ top: delta, behavior: "auto" });
-        perfectScrollbarRef.current?.update();
-      }
-      return;
+    // Keep playback scrolling inside the formula viewport. Calling
+    // scrollIntoView here would scroll the document on mobile and can move
+    // the 3D model out of view when the formula panel is below it.
+    if (list.scrollHeight <= list.clientHeight || list.clientHeight <= 0) return;
+    const listRect = list.getBoundingClientRect();
+    const stepRect = step.getBoundingClientRect();
+    const delta = stepRect.top < listRect.top
+      ? stepRect.top - listRect.top
+      : stepRect.bottom > listRect.bottom
+        ? stepRect.bottom - listRect.bottom
+        : 0;
+    if (delta) {
+      if (typeof list.scrollBy === "function") list.scrollBy({ top: delta, behavior: "auto" });
+      else list.scrollTop += delta;
+      perfectScrollbarRef.current?.update();
     }
-    step.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-    perfectScrollbarRef.current?.update();
   }, [playbackIndex]);
 
   const setPlaybackStep = useCallback((nextIndex: number, animate = true) => {
     const bounded = formula.length === 0 ? -1 : Math.max(-1, Math.min(formula.length - 1, nextIndex));
+    if (formula.length > 0 && bounded >= formula.length - 1) setPlaying(false);
     const previous = playbackIndexRef.current;
     const adjacent = Math.abs(bounded - previous) === 1;
     if (animate && adjacent) {
@@ -358,6 +595,15 @@ export default function App() {
     setMessage(`回放第 ${bounded + 1}/${formula.length} 步 · ${formula[bounded]}`);
   }, [formula]);
 
+  const togglePlayback = () => {
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    if (formula.length > 0 && playbackIndex >= formula.length - 1) setPlaybackStep(-1, false);
+    setPlaying(true);
+  };
+
   useEffect(() => {
     if (!playing || !formula.length || playbackIndex >= formula.length - 1) {
       return undefined;
@@ -365,9 +611,9 @@ export default function App() {
     const timer = window.setTimeout(() => {
       if (playbackIndexRef.current >= formula.length - 1) setPlaying(false);
       else setPlaybackStep(playbackIndexRef.current + 1);
-    }, speed);
+    }, playbackDelayMs);
     return () => window.clearTimeout(timer);
-  }, [formula.length, playbackIndex, playing, setPlaybackStep, speed]);
+  }, [formula.length, playbackIndex, playing, setPlaybackStep, playbackDelayMs]);
 
   const invalidateActiveSolve = () => {
     solveGenerationRef.current += 1;
@@ -397,13 +643,20 @@ export default function App() {
     setMessage(`${label} · 第 ${next.revision} 次修改`);
   };
 
-  const changeOrder = (value: string) => {
-    const nextOrder = Number(value);
-    if (!Number.isInteger(nextOrder) || nextOrder < 2 || nextOrder > 7) return;
-    if (!isSolved(cube) && !window.confirm("切换阶数会替换当前魔方，是否继续？")) return;
+  const applyOrderChange = (nextOrder: number) => {
     const saved = loadCubeForOrder(nextOrder);
     setOrder(nextOrder);
     announce(saved ?? createCubeState(nextOrder), `新建 ${nextOrder}×${nextOrder} 魔方`);
+  };
+
+  const changeOrder = (value: string) => {
+    const nextOrder = Number(value);
+    if (!Number.isInteger(nextOrder) || nextOrder < 2 || nextOrder > 7) return;
+    if (!isSolved(cube)) {
+      setPendingOrder(nextOrder);
+      return;
+    }
+    applyOrderChange(nextOrder);
   };
 
   const paintSticker = (face: Face, position: number) => {
@@ -572,6 +825,15 @@ export default function App() {
   const isBusy = solveStatus !== "idle" && solveStatus !== "completed" && solveStatus !== "failed" && solveStatus !== "cancelled";
   const handleViewChange = useCallback((nextFacing: ViewFacing) => setViewFacing(nextFacing), []);
 
+  if (typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "") === "/status") {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <StatusPage />
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -600,8 +862,9 @@ export default function App() {
           className="topbar"
           sx={{
             display: "flex",
-            alignItems: { xs: "stretch", sm: "flex-end" },
-            flexDirection: { xs: "column", sm: "row" },
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexDirection: "row",
             gap: { xs: 0, sm: 3.5 },
             pb: 0.875,
           }}
@@ -612,7 +875,7 @@ export default function App() {
             variant="overline"
             sx={{
               display: "block",
-              mb: 1,
+              m: 0,
               color: "#7893a2",
               fontSize: ".67rem",
               fontWeight: 750,
@@ -622,6 +885,7 @@ export default function App() {
           >
             613 CODING · 魔方公式工作台
           </Typography>
+          <Button component="a" href="/status" size="small" sx={{ flexShrink: 0 }}>后端状态</Button>
         </Box>
 
         <Box
@@ -670,7 +934,6 @@ export default function App() {
             <FormControl size="small" sx={{ minWidth: { xs: 112, sm: 124 } }}>
               <InputLabel id="order-select-label">魔方阶数</InputLabel>
               <Select
-                native
                 labelId="order-select-label"
                 id="order-select"
                 label="魔方阶数"
@@ -678,7 +941,7 @@ export default function App() {
                 value={order}
                 onChange={(event) => changeOrder(String(event.target.value))}
               >
-                {ORDERS.map((value) => <option key={value} value={value}>{value}×{value}</option>)}
+                {ORDERS.map((value) => <MenuItem key={value} value={value}>{value}×{value}</MenuItem>)}
               </Select>
             </FormControl>
             <Button
@@ -743,7 +1006,7 @@ export default function App() {
                 state={visibleCube}
                 onStickerClick={paintSticker}
                 animation={playbackAnimation}
-                animationDuration={Math.max(240, Math.min(520, speed * 0.72))}
+                animationDuration={Math.max(240, Math.min(520, playbackDelayMs * 0.72))}
                 onViewChange={handleViewChange}
               />
               <Box
@@ -767,7 +1030,6 @@ export default function App() {
                 gap: 2.25,
                 mt: 1.875,
                 pt: 1.875,
-                borderTop: "1px solid #22313b",
               }}
             >
               <Box>
@@ -838,10 +1100,10 @@ export default function App() {
                 minWidth: 0,
                 minHeight: 0,
                 p: { xs: 2, sm: 2.625 },
-                overflow: "visible",
-                height: formula.length ? { xs: "auto", sm: "min(710px, calc(100vh - 32px))", md: "auto" } : "auto",
+                overflow: formula.length ? "hidden" : "visible",
+                height: formula.length ? { xs: "min(640px, calc(100svh - 96px))", sm: "min(710px, calc(100vh - 32px))", md: "auto" } : "auto",
                 maxHeight: formula.length
-                  ? { xs: "none", sm: "min(710px, calc(100vh - 32px))", md: "none" }
+                  ? { xs: "min(640px, calc(100svh - 96px))", sm: "min(710px, calc(100vh - 32px))", md: "none" }
                   : { xs: "none", sm: "710px", md: "min(790px, calc(100vh - 32px))" },
                 [theme.breakpoints.up("sm")]: { overflow: "hidden" },
               }}
@@ -876,26 +1138,52 @@ export default function App() {
                   {formula.length > 0 && <>
                     <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ px: 1.25, fontSize: ".77rem" }}>← 上一步</Button>
                     <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ px: 1.25, fontSize: ".77rem" }}>下一步 →</Button>
-                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={() => setPlaying((value) => !value)} sx={{ px: 1.25, fontSize: ".77rem" }}>{playing ? "暂停" : "播放"}</Button>
+                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ px: 1.25, fontSize: ".77rem" }}>{playing ? "暂停" : "播放"}</Button>
                   </>}
                 </Box>
                 {formula.length > 0 && (
-                  <FormControl size="small" className="speed-control" sx={{ flex: "0 0 104px", gap: 0.625 }}>
+                  <Box
+                    className="speed-control"
+                    sx={{
+                      flex: speedPreset === "custom" ? { xs: "1 1 100%", sm: "0 1 220px" } : "0 0 90px",
+                      minWidth: speedPreset === "custom" ? { sm: 180 } : 90,
+                    }}
+                  >
+                    <FormControl fullWidth size="small" sx={{ gap: 0.625 }}>
                     <InputLabel id="speed-select-label">播放速度</InputLabel>
                     <Select
-                      native
                       labelId="speed-select-label"
                       id="speed-select"
                       label="播放速度"
                       aria-label="播放速度"
-                      value={speed}
-                      onChange={(event) => setSpeed(Number(event.target.value))}
+                      value={speedPreset}
+                      onChange={(event) => setSpeedPreset(event.target.value as SpeedPreset)}
+                      renderValue={(value) => ({ slow: "慢速", standard: "标准", fast: "快速", custom: "自定义" }[value as SpeedPreset])}
                     >
-                      <option value="1000">慢速</option>
-                      <option value="700">标准</option>
-                      <option value="350">快速</option>
+                      <MenuItem value="slow">慢速（1.0 秒/步）</MenuItem>
+                      <MenuItem value="standard">标准（0.7 秒/步）</MenuItem>
+                      <MenuItem value="fast">快速（0.35 秒/步）</MenuItem>
+                      <MenuItem value="custom">自定义</MenuItem>
                     </Select>
-                  </FormControl>
+                    </FormControl>
+                    {speedPreset === "custom" && (
+                      <Box sx={{ px: 0.75, pt: 1.25 }}>
+                        <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>
+                          每步 {customSpeedSeconds.toFixed(1)} 秒
+                        </Typography>
+                        <Slider
+                          aria-label="自定义每步秒数"
+                          value={customSpeedSeconds}
+                          min={CUSTOM_SPEED_MIN_SECONDS}
+                          max={CUSTOM_SPEED_MAX_SECONDS}
+                          step={CUSTOM_SPEED_STEP_SECONDS}
+                          valueLabelDisplay="auto"
+                          valueLabelFormat={(value) => `${Number(value).toFixed(1)} 秒`}
+                          onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
+                        />
+                      </Box>
+                    )}
+                  </Box>
                 )}
               </Box>
 
@@ -910,11 +1198,16 @@ export default function App() {
                     display: "grid",
                     flex: "1 1 auto",
                     gridTemplateColumns: "minmax(0, 1fr)",
+                    alignContent: "start",
                     gap: 0.875,
                     minHeight: 0,
                     m: "15px 0 0",
-                    p: "0 5px 0 0",
-                    overflowY: "visible",
+                    // Perfect Scrollbar draws its rail over the right edge of
+                    // the container, so reserve a gutter for it explicitly.
+                    p: formulaScrollbarEnabled ? "0 16px 0 0" : "0 5px 0 0",
+                    overflowY: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    scrollbarGutter: "stable",
                     overscrollBehavior: "contain",
                     listStyle: "none",
                     [theme.breakpoints.up("sm")]: { overflowY: "hidden" },
@@ -1008,6 +1301,35 @@ export default function App() {
             </Paper>
           </Box>
         </Box>
+        <Dialog
+          open={pendingOrder !== null}
+          onClose={() => setPendingOrder(null)}
+          aria-labelledby="change-order-dialog-title"
+          aria-describedby="change-order-dialog-description"
+          fullWidth
+          maxWidth="xs"
+        >
+          <DialogTitle id="change-order-dialog-title">切换魔方阶数</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="change-order-dialog-description">
+              切换阶数会替换当前魔方，是否继续？
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPendingOrder(null)}>取消</Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                if (pendingOrder !== null) applyOrderChange(pendingOrder);
+                setPendingOrder(null);
+              }}
+              sx={{ color: "primary.contrastText" }}
+            >
+              确定
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ThemeProvider>
   );

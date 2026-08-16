@@ -603,11 +603,11 @@ export default function CubeViewport({
           flexWrap: 'wrap',
           gap: { xs: 0.75, sm: 1.25 },
           p: { xs: 0.5, sm: 0.75 },
-          border: '1px solid rgb(72 99 114 / 72%)',
+          border: 'none',
           borderRadius: 1.5,
           bgcolor: 'rgb(10 19 26 / 84%)',
           backdropFilter: 'blur(12px)',
-          boxShadow: '0 8px 24px rgb(0 0 0 / 18%)',
+          boxShadow: 'none',
         }}
       >
         <Box

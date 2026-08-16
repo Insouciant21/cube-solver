@@ -16,7 +16,16 @@ Docker Compose 提供生产式的本地单入口，并将高阶查找表持久�
 docker compose up -d --build
 ```
 
+Compose 要求先配置状态页令牌；请使用密码管理器或随机值保存它：
+
+```bash
+export CUBE_STATUS_TOKEN="$(openssl rand -hex 32)"
+docker compose up -d --build
+```
+
 浏览器地址：http://127.0.0.1:6131
+
+后端状态页：http://127.0.0.1:6131/status。打开后输入同一个令牌，页面会显示求解器注册状态、当前任务和 FIFO 等待队列；令牌只保存在当前浏览器会话中。
 
 健康检查：
 
@@ -188,6 +197,8 @@ curl http://localhost:8000/api/health
 - Three.js canvas 预览支持按阶数生成六面贴纸、可跨越顶/底面的四元数自由拖拽视角、六面快速对准、滚轮/双指缩放以及重置/适配视图；3D 涂色不会重置相机，贴纸颜色不受底面光照阴影影响。无 WebGL 时保留可访问的 canvas 占位。
 - 解法列表与 3D 模型并排显示，逐步播放时按移动轴/层做 90°、180° 动画，并在界面显示当前镜头朝向。
 - 前端默认使用 F/U 参考面，支持 `/api/validate`、`/api/solve`、SSE 事件订阅、取消任务和显示 replay-verified 公式。
+- 播放速度使用 MUI 下拉菜单，支持慢速、标准、快速和 0.1–5.0 秒/步的自定义滑块；播放到最后一步会自动暂停。阶数切换使用 MUI 确认对话框。
+- `/status` 页面通过 Bearer Token 访问 `/api/status`，只返回队列和任务元数据，不返回魔方贴纸；状态接口未配置令牌时会 fail closed。
 - FastAPI 提供颜色数量/结构/方向校验、短任务生命周期、取消、SSE，以及后端几何 replay 校验。
 - 默认求解路径是固定版本 `rubiks-cube-NxNxN-solver`，会按阶数选择 2x2/3x3 或 4x4–7x7 降阶查表流程；所有结果都经过后端 replay 验证。
 - 仅当 `CUBE_ALLOW_BOUNDED_FALLBACK=1` 时才允许确定性 BFS 处理短公式开发样例；Compose 生产配置将其关闭，正式后端不可用时返回 `SOLVER_UNAVAILABLE`，helper/进程执行故障返回 `SOLVER_OPERATIONAL_ERROR`。
