@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { Box, Button, IconButton, Typography } from '@mui/material';
+import { Box, Button, ButtonGroup, SvgIcon, Typography } from '@mui/material';
 import * as THREE from 'three';
 
 import type { CubeState } from './cube/state';
@@ -70,6 +70,22 @@ interface ViewControls {
   reset: () => void;
   fit: () => void;
   face: (face: CubeFace) => void;
+}
+
+function ResetViewIcon() {
+  return (
+    <SvgIcon fontSize="small" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z" />
+    </SvgIcon>
+  );
+}
+
+function FitViewIcon() {
+  return (
+    <SvgIcon fontSize="small" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 4h6V2H2v8h2V4Zm10-2v2h6v6h2V2h-8ZM4 14H2v8h8v-2H4v-6Zm16 0v6h-6v2h8v-8h-2Z" />
+    </SvgIcon>
+  );
 }
 
 function stickerPosition(face: CubeFace, row: number, column: number, order: number): THREE.Vector3 {
@@ -572,40 +588,109 @@ export default function CubeViewport({
       className="cube-viewport-shell"
       sx={{ position: 'relative', width: '100%', minHeight: '27rem', touchAction: 'none' }}
     >
-      <Box className="cube-view-controls" aria-label="3D 视角控制" sx={{ position: 'absolute', top: 1.5, right: 1.5, zIndex: 4, display: 'flex', gap: 0.875 }}>
-        <IconButton
-          aria-label="重置视角"
-          onClick={() => viewControlsRef.current.reset()}
-          title="重置视角"
-          type="button"
-          sx={{ width: 37, height: 37, color: '#e8edf2', bgcolor: 'rgb(12 20 27 / 86%)', border: '1px solid #486372', borderRadius: 1, p: 0, fontSize: '1.1rem' }}
+      <Box
+        className="cube-viewport-toolbar"
+        aria-label="3D 视角控制"
+        sx={{
+          position: 'absolute',
+          top: 1.5,
+          right: 1.5,
+          left: 1.5,
+          zIndex: 4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: { xs: 0.75, sm: 1.25 },
+          p: { xs: 0.5, sm: 0.75 },
+          border: '1px solid rgb(72 99 114 / 72%)',
+          borderRadius: 1.5,
+          bgcolor: 'rgb(10 19 26 / 84%)',
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 8px 24px rgb(0 0 0 / 18%)',
+        }}
+      >
+        <Box
+          className="cube-face-presets"
+          role="group"
+          aria-label="六面快速视角"
+          sx={{ display: 'flex', alignItems: 'center', minWidth: 0, gap: { xs: 0.5, sm: 0.875 } }}
         >
-          ↺
-        </IconButton>
-        <IconButton
-          aria-label="适应窗口"
-          onClick={() => viewControlsRef.current.fit()}
-          title="适应窗口"
-          type="button"
-          sx={{ width: 37, height: 37, color: '#e8edf2', bgcolor: 'rgb(12 20 27 / 86%)', border: '1px solid #486372', borderRadius: 1, p: 0, fontSize: '1.1rem' }}
-        >
-          ⊙
-        </IconButton>
-      </Box>
-      <Box className="cube-face-presets" role="group" aria-label="六面快速视角" sx={{ position: 'absolute', top: 1.5, left: 1.5, zIndex: 4, display: 'flex', flexWrap: 'wrap', gap: 0.625, maxWidth: 'min(60%, 330px)' }}>
-        {quickFaces.map((face) => (
-          <Button
-            key={face}
-            variant="outlined"
-            size="small"
-            type="button"
-            onClick={() => viewControlsRef.current.face(face)}
-            aria-label={`查看 ${face} 面`}
-            sx={{ minWidth: 31, minHeight: 31, color: '#b9cbd2', bgcolor: 'rgb(12 20 27 / 82%)', borderColor: '#3c5662', borderRadius: 1, px: 0.875, py: 0.5, fontSize: '.72rem', fontWeight: 760 }}
+          <Typography
+            component="span"
+            sx={{ display: { xs: 'none', sm: 'inline' }, px: 0.5, color: '#8fa7b2', fontSize: '.68rem', fontWeight: 700, whiteSpace: 'nowrap' }}
           >
-            {face}
+            快速对准
+          </Typography>
+          <ButtonGroup variant="outlined" size="small" aria-label="六面快速对准" sx={{ flexShrink: 0 }}>
+            {quickFaces.map((face) => (
+              <Button
+                key={face}
+                type="button"
+                onClick={() => viewControlsRef.current.face(face)}
+                aria-label={`查看 ${face} 面`}
+                title={`查看 ${face} 面`}
+                sx={{
+                  minWidth: { xs: 32, sm: 36 },
+                  minHeight: { xs: 32, sm: 35 },
+                  px: { xs: 0.75, sm: 1 },
+                  py: 0.5,
+                  color: '#d2e0e4',
+                  bgcolor: 'rgb(12 20 27 / 76%)',
+                  borderColor: '#3c5662',
+                  fontSize: '.73rem',
+                  fontWeight: 760,
+                  '&:hover': { bgcolor: 'rgb(28 48 57 / 92%)', borderColor: '#72b8b0', zIndex: 1 },
+                }}
+              >
+                {face}
+              </Button>
+            ))}
+          </ButtonGroup>
+        </Box>
+
+        <Box className="cube-view-controls" sx={{ display: 'flex', alignItems: 'center', gap: 0.625, flexShrink: 0 }}>
+          <Button
+            aria-label="重置视角"
+            onClick={() => viewControlsRef.current.reset()}
+            title="重置视角"
+            type="button"
+            startIcon={<ResetViewIcon />}
+            sx={{
+              minWidth: { xs: 36, sm: 112 },
+              minHeight: { xs: 32, sm: 35 },
+              px: { xs: 0.75, sm: 1.125 },
+              color: '#e8edf2',
+              bgcolor: 'rgb(12 20 27 / 76%)',
+              borderColor: '#486372',
+              fontSize: '.72rem',
+              '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.625 } },
+              '&:hover': { bgcolor: 'rgb(28 48 57 / 92%)', borderColor: '#8cc8c4' },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>重置视角</Box>
           </Button>
-        ))}
+          <Button
+            aria-label="适应窗口"
+            onClick={() => viewControlsRef.current.fit()}
+            title="适应窗口"
+            type="button"
+            startIcon={<FitViewIcon />}
+            sx={{
+              minWidth: { xs: 36, sm: 108 },
+              minHeight: { xs: 32, sm: 35 },
+              px: { xs: 0.75, sm: 1.125 },
+              color: '#e8edf2',
+              bgcolor: 'rgb(12 20 27 / 76%)',
+              borderColor: '#486372',
+              fontSize: '.72rem',
+              '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.625 } },
+              '&:hover': { bgcolor: 'rgb(28 48 57 / 92%)', borderColor: '#8cc8c4' },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>适应窗口</Box>
+          </Button>
+        </Box>
       </Box>
       <canvas
         ref={canvasRef}
