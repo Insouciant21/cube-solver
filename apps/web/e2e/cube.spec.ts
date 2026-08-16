@@ -152,14 +152,32 @@ test("long solution formula stays readable and contained", async ({ page }, test
   await formula.screenshot({ path: testInfo.outputPath("long-formula.png") });
 });
 
-test("mobile keeps the canvas and controls usable", async ({ page }) => {
+test("mobile keeps the canvas and controls usable", async ({ page }, testInfo) => {
   await mockApi(page);
   await page.goto("/");
+
+  if (testInfo.project.name === "mobile") {
+    const mobileLayout = await page.evaluate(() => {
+      const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
+      const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
+      const control = document.querySelector<HTMLElement>(".control-panel")?.getBoundingClientRect();
+      if (!cube || !solution || !control) return null;
+      return {
+        cubeLeft: cube.left,
+        solutionLeft: solution.left,
+        firstRowBottom: Math.max(cube.bottom, solution.bottom),
+        controlTop: control.top,
+      };
+    });
+    expect(mobileLayout).not.toBeNull();
+    expect(mobileLayout?.cubeLeft).toBeLessThan(mobileLayout?.solutionLeft ?? 0);
+    expect(mobileLayout?.controlTop).toBeGreaterThanOrEqual((mobileLayout?.firstRowBottom ?? 0) - 1);
+  }
 
   const canvas = page.getByTestId("three-cube-canvas");
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
-  expect(box?.width).toBeGreaterThan(250);
+  expect(box?.width).toBeGreaterThan(testInfo.project.name === "mobile" ? 120 : 250);
   expect(box?.height).toBeGreaterThan(180);
 
   await page.getByRole("combobox", { name: "魔方阶数" }).click();

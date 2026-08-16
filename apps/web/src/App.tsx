@@ -178,9 +178,9 @@ const STATUS_LABELS: Record<SolveStatus, string> = {
   cancelled: "已取消",
 };
 const STATUS_TOKEN_STORAGE_KEY = "613-cube-status-token";
-const CUSTOM_SPEED_MIN_SECONDS = 0.1;
-const CUSTOM_SPEED_MAX_SECONDS = 5;
-const CUSTOM_SPEED_STEP_SECONDS = 0.1;
+const CUSTOM_SPEED_MIN_SECONDS = 0;
+const CUSTOM_SPEED_MAX_SECONDS = 1;
+const CUSTOM_SPEED_STEP_SECONDS = 0.05;
 const PRESET_SPEEDS: Record<Exclude<SpeedPreset, "custom">, number> = {
   slow: 1000,
   standard: 700,
@@ -189,6 +189,10 @@ const PRESET_SPEEDS: Record<Exclude<SpeedPreset, "custom">, number> = {
 
 function faceLabel(face: Face): string {
   return `${FACE_LABELS[face]}面`;
+}
+
+function formatCustomSpeed(seconds: number): string {
+  return `${Number(seconds.toFixed(2))} 秒`;
 }
 
 function readStoredCube(key: string): CubeState | null {
@@ -885,7 +889,6 @@ export default function App() {
           >
             613 CODING · 魔方公式工作台
           </Typography>
-          <Button component="a" href="/status" size="small" sx={{ flexShrink: 0 }}>后端状态</Button>
         </Box>
 
         <Box
@@ -962,9 +965,9 @@ export default function App() {
           className={`workbench${formula.length ? " has-formula" : ""}`}
           sx={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr)",
+            gridTemplateColumns: { xs: "minmax(0, 1fr) minmax(0, 1fr)", md: "minmax(0, 1.35fr) minmax(370px, .82fr)" },
             alignItems: "start",
-            gap: 2.25,
+            gap: { xs: 1.25, md: 2.25 },
             pt: { xs: 1.5, sm: 3 },
             [theme.breakpoints.up("md")]: {
               gridTemplateColumns: "minmax(0, 1.35fr) minmax(370px, .82fr)",
@@ -1075,7 +1078,7 @@ export default function App() {
             component="aside"
             className="side-column"
             sx={{
-              display: "grid",
+              display: { xs: "contents", md: "grid" },
               gridTemplateColumns: "minmax(0, 1fr)",
               gap: 2.25,
               minWidth: 0,
@@ -1169,7 +1172,7 @@ export default function App() {
                     {speedPreset === "custom" && (
                       <Box sx={{ px: 0.75, pt: 1.25 }}>
                         <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>
-                          每步 {customSpeedSeconds.toFixed(1)} 秒
+                          每步 {formatCustomSpeed(customSpeedSeconds)}
                         </Typography>
                         <Slider
                           aria-label="自定义每步秒数"
@@ -1178,7 +1181,7 @@ export default function App() {
                           max={CUSTOM_SPEED_MAX_SECONDS}
                           step={CUSTOM_SPEED_STEP_SECONDS}
                           valueLabelDisplay="auto"
-                          valueLabelFormat={(value) => `${Number(value).toFixed(1)} 秒`}
+                          valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
                           onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
                         />
                       </Box>
@@ -1254,7 +1257,7 @@ export default function App() {
               )}
             </Paper>
 
-            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 } }}>
+            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 }, gridColumn: { xs: "1 / -1", md: "auto" } }}>
               <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
                 <Box>
                   <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
