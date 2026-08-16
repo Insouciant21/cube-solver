@@ -182,11 +182,17 @@ test("long solution formula stays readable and contained", async ({ page }, test
       const cube = document.querySelector<HTMLElement>(".cube-panel")?.getBoundingClientRect();
       const solution = document.querySelector<HTMLElement>(".solution-panel")?.getBoundingClientRect();
       if (!controls || !cube || !solution) return null;
-      return { controlsBottom: controls.bottom, cubeTop: cube.top, cubeBottom: cube.bottom, solutionTop: solution.top };
+      return { controlsBottom: controls.bottom, cubeLeft: cube.left, solutionLeft: solution.left, cubeTop: cube.top, solutionTop: solution.top };
     });
     expect(mobileWorkspaceOrder).not.toBeNull();
     expect(mobileWorkspaceOrder?.controlsBottom).toBeLessThanOrEqual((mobileWorkspaceOrder?.cubeTop ?? 0) + 1);
-    expect(mobileWorkspaceOrder?.solutionTop).toBeGreaterThanOrEqual((mobileWorkspaceOrder?.cubeBottom ?? 0) - 1);
+    expect(mobileWorkspaceOrder?.cubeLeft).toBeLessThan(mobileWorkspaceOrder?.solutionLeft ?? 0);
+    expect(mobileWorkspaceOrder?.solutionTop).toBeCloseTo(mobileWorkspaceOrder?.cubeTop ?? 0, 0);
+    const playbackButtonsFit = await page.locator(".mobile-workspace-controls .formula-actions button").evaluateAll((buttons) => {
+      const rects = buttons.map((button) => button.getBoundingClientRect());
+      return rects.every((rect, index) => index === 0 || rect.left >= rects[index - 1].right - 1);
+    });
+    expect(playbackButtonsFit).toBe(true);
     const mobilePanelLayout = await formula.evaluate((element) => {
       const style = getComputedStyle(element);
       return {
@@ -241,10 +247,10 @@ test("mobile keeps the canvas and controls usable", async ({ page }, testInfo) =
       };
     });
     expect(mobileLayout).not.toBeNull();
-    expect(mobileLayout?.cubeLeft).toBeCloseTo(mobileLayout?.solutionLeft ?? 0, 0);
+    expect(mobileLayout?.cubeLeft).toBeLessThan(mobileLayout?.solutionLeft ?? 0);
     expect(mobileLayout?.workspaceControlsBottom).toBeLessThanOrEqual((mobileLayout?.cubeTop ?? 0) + 1);
-    expect(mobileLayout?.solutionTop).toBeGreaterThanOrEqual((mobileLayout?.cubeBottom ?? 0) - 1);
-    expect(mobileLayout?.editorTop).toBeGreaterThanOrEqual((mobileLayout?.solutionBottom ?? 0) - 1);
+    expect(mobileLayout?.solutionTop).toBeCloseTo(mobileLayout?.cubeTop ?? 0, 0);
+    expect(mobileLayout?.editorTop).toBeGreaterThanOrEqual(Math.max(mobileLayout?.cubeBottom ?? 0, mobileLayout?.solutionBottom ?? 0) - 1);
     expect(mobileLayout?.controlTop).toBeGreaterThanOrEqual((mobileLayout?.editorBottom ?? 0) - 1);
   }
 

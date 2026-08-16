@@ -235,11 +235,11 @@ function MobileWorkspaceControls({
       aria-label="移动端工作区控制"
       sx={{
         display: "grid",
+        gridArea: "mobile-controls",
         gap: 1,
         minWidth: 0,
-        p: 1.25,
-        border: "1px solid #263945",
-        borderRadius: 1.5,
+        p: { xs: 1.25, sm: 0 },
+        borderBottom: "1px solid #263945",
         bgcolor: "#0d171e",
       }}
     >
@@ -267,8 +267,8 @@ function MobileWorkspaceControls({
         <Box
           className="mobile-playback-controls"
           sx={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
+            display: "flex",
+            flexWrap: "wrap",
             alignItems: "center",
             gap: 1,
             minWidth: 0,
@@ -276,13 +276,13 @@ function MobileWorkspaceControls({
             borderTop: "1px solid #22313b",
           }}
         >
-          <Box className="formula-actions" sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, minWidth: 0 }}>
-            <Button type="button" onClick={onCopyFormula} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>复制公式</Button>
-            <Button type="button" aria-label="上一步" onClick={onPrevious} disabled={playbackIndex < 0} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>← 上一步</Button>
-            <Button type="button" aria-label="下一步" onClick={onNext} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>下一步 →</Button>
-            <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={onTogglePlayback} sx={{ minHeight: 35, px: 1, fontSize: ".73rem" }}>{playing ? "暂停" : "播放"}</Button>
+          <Box className="formula-actions" sx={{ display: "flex", flexWrap: "nowrap", gap: 0.75, width: "100%", minWidth: 0 }}>
+            <Button type="button" onClick={onCopyFormula} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>复制公式</Button>
+            <Button type="button" aria-label="上一步" onClick={onPrevious} disabled={playbackIndex < 0} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>← 上一步</Button>
+            <Button type="button" aria-label="下一步" onClick={onNext} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>下一步 →</Button>
+            <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={onTogglePlayback} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
           </Box>
-          <FormControl className="mobile-speed-select" size="small" sx={{ minWidth: 92, width: 112 }}>
+          <FormControl className="mobile-speed-select" size="small" sx={{ flex: "1 1 100%", width: "100%" }}>
             <InputLabel id="mobile-speed-select-label">播放速度</InputLabel>
             <Select
               labelId="mobile-speed-select-label"
@@ -300,7 +300,7 @@ function MobileWorkspaceControls({
             </Select>
           </FormControl>
           {speedPreset === "custom" && (
-            <Box className="mobile-custom-speed" sx={{ gridColumn: "1 / -1", display: "grid", gap: 0.375, px: 0.5 }}>
+            <Box className="mobile-custom-speed" sx={{ display: "grid", flex: "1 1 100%", width: "100%", gap: 0.375, px: 0.5 }}>
               <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>每步 {formatCustomSpeed(customSpeedSeconds)}</Typography>
               <Slider
                 aria-label="移动端自定义每步秒数"
@@ -1103,9 +1103,9 @@ export default function App() {
             pt: { xs: 1.5, sm: 3 },
             [MOBILE_LAYOUT_QUERY]: {
               gridTemplateColumns: "minmax(0, 1fr)",
-              gridTemplateAreas: '"mobile-controls" "workspace"',
+              gridTemplateAreas: '"workspace"',
               columnGap: 0,
-              rowGap: 1,
+              rowGap: 0,
               alignItems: "stretch",
             },
             [DESKTOP_LAYOUT_QUERY]: {
@@ -1114,6 +1114,27 @@ export default function App() {
             },
           }}
         >
+          <Box
+            className="mobile-workspace"
+            sx={{
+              display: "contents",
+              minWidth: 0,
+              [MOBILE_LAYOUT_QUERY]: {
+                display: "grid",
+                gridArea: "workspace",
+                gridTemplateColumns: "minmax(0, 1.65fr) minmax(120px, .85fr)",
+                gridTemplateAreas: '"mobile-controls mobile-controls" "cube solution" "editor editor" "control control"',
+                columnGap: 0.875,
+                rowGap: 0,
+                minWidth: 0,
+                p: 1.25,
+                border: "1px solid #263945",
+                borderRadius: 1.5,
+                bgcolor: "#111a21",
+                overflow: "hidden",
+              },
+            }}
+          >
           {mobileLayout && (
             <MobileWorkspaceControls
               viewControls={viewportControls}
@@ -1130,21 +1151,6 @@ export default function App() {
               onCustomSpeedChange={setCustomSpeedSeconds}
             />
           )}
-          <Box
-            className="mobile-workspace"
-            sx={{
-              display: "contents",
-              minWidth: 0,
-              [MOBILE_LAYOUT_QUERY]: {
-                display: "grid",
-                gridArea: "workspace",
-                gridTemplateColumns: "minmax(0, 1fr)",
-                gridTemplateAreas: '"cube" "solution" "editor" "control"',
-                gap: 1,
-                minWidth: 0,
-              },
-            }}
-          >
           <Box
             className="left-column"
             sx={{
@@ -1164,7 +1170,7 @@ export default function App() {
               minWidth: 0,
               alignSelf: "start",
               p: { xs: 1.5, sm: 3.375 },
-              [MOBILE_LAYOUT_QUERY]: { gridArea: "cube" },
+              [MOBILE_LAYOUT_QUERY]: { gridArea: "cube", p: 0.75, border: "none", borderRadius: 0, bgcolor: "transparent" },
             }}
           >
             <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
@@ -1302,7 +1308,10 @@ export default function App() {
                   gridArea: "solution",
                   height: formula.length ? "min(460px, calc(100svh - 280px))" : "auto",
                   maxHeight: formula.length ? "460px" : "none",
-                  p: 1.25,
+                  p: 0.75,
+                  border: "none",
+                  borderRadius: 0,
+                  bgcolor: "transparent",
                 },
                 [DESKTOP_LAYOUT_QUERY]: {
                   height: "auto",
@@ -1449,7 +1458,7 @@ export default function App() {
               )}
             </Paper>
 
-            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 }, [MOBILE_LAYOUT_QUERY]: { gridArea: "control" } }}>
+            <Paper component="section" className="panel control-panel" aria-labelledby="control-panel-title" sx={{ minWidth: 0, p: { xs: 2, sm: 2.625 }, [MOBILE_LAYOUT_QUERY]: { gridArea: "control", p: 0.75, border: "none", borderRadius: 0, bgcolor: "transparent" } }}>
               <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
                 <Box>
                   <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
