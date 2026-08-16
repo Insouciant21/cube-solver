@@ -1,0 +1,52 @@
+volumes:
+  solver-data:
+
+services:
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      SOLVER_TIMEOUT_SECONDS: "1800"
+      CUBE_ALLOW_BOUNDED_FALLBACK: "0"
+      CUBE_IDA_SEARCH_PATH: "/usr/local/bin/ida_search_via_graph"
+      CUBE_LOOKUP_TABLE_PATH: "/app/lookup-tables"
+      SOLVER_CPU_SECONDS: "1800"
+      SOLVER_MEMORY_BYTES: "7516192768"
+      SOLVER_PID_LIMIT: "256"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1g
+    mem_limit: 8g
+    cpus: "4.0"
+    pids_limit: 256
+    volumes:
+      - solver-data:/app/lookup-tables
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    expose:
+      - "8000"
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:6131:8080"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    restart: unless-stopped

@@ -8,6 +8,10 @@
     "test:web": "npm run test --workspace @613-cube-solver/web",
     "lint:web": "npm run lint --workspace @613-cube-solver/web",
     "typecheck:web": "npm run typecheck --workspace @613-cube-solver/web",
-    "build:web": "npm run build --workspace @613-cube-solver/web"
+    "build:web": "npm run build --workspace @613-cube-solver/web",
+    "test:e2e:web": "playwright test --config=apps/web/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

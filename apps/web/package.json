@@ -11,10 +11,15 @@
     "build": "tsc -b && vite build"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.3.1",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
+    "perfect-scrollbar": "^1.5.6",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "three": "^0.185.1",
+    "vite": "latest"
   },
   "devDependencies": {
     "@eslint/js": "latest",
@@ -23,6 +28,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/three": "^0.185.4",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",

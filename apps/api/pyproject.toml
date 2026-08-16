@@ -24,6 +24,7 @@ build-backend = "hatchling.build"
 packages = ["src/cube_api"]
 
 [tool.pytest.ini_options]
+markers = ["slow: real table-backed solver integration tests"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 

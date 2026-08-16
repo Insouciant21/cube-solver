@@ -1,0 +1,11 @@
+node_modules/
+apps/web/node_modules/
+apps/web/dist/
+apps/api/.venv/
+apps/api/.mypy_cache/
+apps/api/.pytest_cache/
+apps/api/.ruff_cache/
+.613-coding/
+.git/
+*.pyc
+__pycache__/
