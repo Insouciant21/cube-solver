@@ -32,7 +32,8 @@ test("desktop inspects the 3D workbench, uses the default frame, and replays for
   await page.goto("/");
 
   await expect(page.getByText("613 CODING · 魔方公式工作台")).toBeVisible();
-  await page.getByLabel("魔方阶数").selectOption("7");
+  await page.getByRole("combobox", { name: "魔方阶数" }).click();
+  await page.getByRole("option", { name: "7×7" }).click();
   await expect(page.getByTestId("three-cube-canvas")).toBeVisible();
   await expect(page.getByRole("group", { name: "六面快速视角" }).getByRole("button")).toHaveCount(6);
   await page.getByRole("button", { name: "校验状态" }).click();
@@ -100,6 +101,16 @@ test("long solution formula stays readable and contained", async ({ page }, test
     }))).toMatchObject({ overflowY: "hidden" });
     await expect(moveList).toHaveAttribute("data-scrollbar", "perfect");
     await expect(moveList.locator(".ps__rail-y")).toBeVisible();
+    const scrollbarGeometry = await moveList.evaluate((element) => {
+      const rail = element.querySelector<HTMLElement>(".ps__rail-y");
+      const firstButton = element.querySelector<HTMLElement>("button");
+      if (!rail || !firstButton) return null;
+      const railRect = rail.getBoundingClientRect();
+      const buttonRect = firstButton.getBoundingClientRect();
+      return { railLeft: railRect.left, buttonRight: buttonRect.right };
+    });
+    expect(scrollbarGeometry).not.toBeNull();
+    expect(scrollbarGeometry?.buttonRight).toBeLessThanOrEqual((scrollbarGeometry?.railLeft ?? 0) - 3);
     for (let index = 0; index < 20; index += 1) {
       await page.getByRole("button", { name: "下一步" }).click();
     }
@@ -119,13 +130,24 @@ test("long solution formula stays readable and contained", async ({ page }, test
       return {
         maxHeight: style.maxHeight,
         overflowY: style.overflowY,
-        scrollHeight: element.scrollHeight,
-        clientHeight: element.clientHeight,
       };
     });
-    expect(mobilePanelLayout.maxHeight).toBe("none");
-    expect(mobilePanelLayout.overflowY).toBe("visible");
-    expect(mobilePanelLayout.scrollHeight).toBe(mobilePanelLayout.clientHeight);
+    expect(mobilePanelLayout.maxHeight).not.toBe("none");
+    expect(mobilePanelLayout.overflowY).toBe("hidden");
+    await expect.poll(() => moveList.evaluate((element) => ({
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    }))).toMatchObject({ overflowY: "auto" });
+    const documentScrollBeforePlayback = await page.evaluate(() => window.scrollY);
+    await page.getByRole("button", { name: "下一步" }).click();
+    const documentScrollAfterFirstStep = await page.evaluate(() => window.scrollY);
+    for (let index = 1; index < 20; index += 1) {
+      await page.getByRole("button", { name: "下一步" }).click();
+    }
+    expect(documentScrollAfterFirstStep).toBeGreaterThanOrEqual(documentScrollBeforePlayback);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(documentScrollAfterFirstStep);
+    await expect.poll(() => moveList.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   }
   await formula.screenshot({ path: testInfo.outputPath("long-formula.png") });
 });
@@ -140,7 +162,8 @@ test("mobile keeps the canvas and controls usable", async ({ page }) => {
   expect(box?.width).toBeGreaterThan(250);
   expect(box?.height).toBeGreaterThan(180);
 
-  await page.getByLabel("魔方阶数").selectOption("2");
+  await page.getByRole("combobox", { name: "魔方阶数" }).click();
+  await page.getByRole("option", { name: "2×2" }).click();
   await expect(page.getByTestId("three-cube-canvas")).toBeVisible();
   await page.getByRole("button", { name: "选择红色" }).click();
   await expect(page.getByRole("button", { name: "选择红色" })).toHaveAttribute("aria-pressed", "true");

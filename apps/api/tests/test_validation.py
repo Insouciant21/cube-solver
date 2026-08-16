@@ -32,6 +32,49 @@ def test_validate_accepts_a_solved_state() -> None:
     assert response.json() == {"ok": True, "errors": [], "revision": 7}
 
 
+def test_status_requires_bearer_auth_and_exposes_queue_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CUBE_STATUS_TOKEN", "test-status-token")
+    client = TestClient(create_app())
+
+    assert client.get("/api/status").status_code == 401
+    assert client.get(
+        "/api/status", headers={"Authorization": "Bearer wrong-token"}
+    ).status_code == 401
+
+    response = client.get(
+        "/api/status",
+        headers={"Authorization": "Bearer test-status-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert set(body["jobs"]) == {
+        "total",
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+    }
+    assert body["queue"] == []
+    assert "stickers" not in response.text
+
+
+def test_status_fails_closed_when_authentication_is_not_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CUBE_STATUS_TOKEN", raising=False)
+
+    response = TestClient(create_app()).get(
+        "/api/status", headers={"Authorization": "Bearer anything"}
+    )
+
+    assert response.status_code == 503
+
+
 def test_validate_reports_color_count_diagnostics() -> None:
     payload = solved_payload()
     stickers = payload["stickers"]

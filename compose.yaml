@@ -13,6 +13,7 @@ services:
       SOLVER_CPU_SECONDS: "1800"
       SOLVER_MEMORY_BYTES: "7516192768"
       SOLVER_PID_LIMIT: "256"
+      CUBE_STATUS_TOKEN: ${CUBE_STATUS_TOKEN:?CUBE_STATUS_TOKEN must be set}
     read_only: true
     cap_drop:
       - ALL
