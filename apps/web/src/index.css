@@ -80,6 +80,10 @@ select {
 }
 
 @media (max-width: 760px) {
+  .cube-viewport-toolbar {
+    display: none !important;
+  }
+
   .cube-viewport-stage {
     height: 23rem;
     min-height: 23rem;
