@@ -27,6 +27,7 @@ describe("App", () => {
     expect(screen.queryByText("本地验证状态，生成可回放的 NxNxN 还原公式。")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "魔方阶数" })).toHaveTextContent("3×3");
+    expect(screen.queryByRole("link", { name: "后端状态" })).not.toBeInTheDocument();
     expect(screen.getByRole("img", { name: "3D 魔方编辑器。点击贴纸修改颜色，拖动旋转视角。" })).toBeInTheDocument();
     expect(screen.queryByText("Sticker palette")).not.toBeInTheDocument();
   });
@@ -302,6 +303,9 @@ it("supports custom playback speed and pauses after the final step", async () =>
 
   chooseSelect("播放速度", "自定义");
   expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuenow", "1");
+  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuemin", "0");
+  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuemax", "1");
+  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("step", "0.05");
   fireEvent.click(screen.getByRole("button", { name: "播放公式" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "播放公式" })).toBeInTheDocument(), { timeout: 3500 });
   expect(screen.getByRole("button", { name: "第 2 步 U" })).toHaveAttribute("aria-current", "step");
