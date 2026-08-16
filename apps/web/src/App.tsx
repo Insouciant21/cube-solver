@@ -201,11 +201,17 @@ function formatCustomSpeed(seconds: number): string {
 
 interface MobileWorkspaceControlsProps {
   viewControls: ViewControls | null;
+  order: number;
   formula: string[];
   playbackIndex: number;
   playing: boolean;
   speedPreset: SpeedPreset;
   customSpeedSeconds: number;
+  isBusy: boolean;
+  hasActiveJob: boolean;
+  onOrderChange: (value: string) => void;
+  onSolve: () => void;
+  onCancelSolve: () => void;
   onCopyFormula: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -216,11 +222,17 @@ interface MobileWorkspaceControlsProps {
 
 function MobileWorkspaceControls({
   viewControls,
+  order,
   formula,
   playbackIndex,
   playing,
   speedPreset,
   customSpeedSeconds,
+  isBusy,
+  hasActiveJob,
+  onOrderChange,
+  onSolve,
+  onCancelSolve,
   onCopyFormula,
   onPrevious,
   onNext,
@@ -261,6 +273,46 @@ function MobileWorkspaceControls({
         </ButtonGroup>
         <Button type="button" aria-label="重置视角" onClick={() => viewControls?.reset()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".72rem" }}>↻</Button>
         <Button type="button" aria-label="适应窗口" onClick={() => viewControls?.fit()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".82rem" }}>⛶</Button>
+      </Box>
+
+      <Box
+        className="mobile-solve-controls"
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(112px, auto)",
+          alignItems: "center",
+          gap: 0.75,
+          minWidth: 0,
+        }}
+      >
+        <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
+          <InputLabel id="mobile-order-select-label">魔方阶数</InputLabel>
+          <Select
+            labelId="mobile-order-select-label"
+            id="mobile-order-select"
+            label="魔方阶数"
+            aria-label="魔方阶数"
+            value={order}
+            onChange={(event) => onOrderChange(String(event.target.value))}
+          >
+            {ORDERS.map((value) => <MenuItem key={value} value={value}>{value}×{value}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button
+          variant="contained"
+          color="primary"
+          type="button"
+          onClick={onSolve}
+          disabled={isBusy}
+          sx={{ width: "100%", minWidth: 112, px: 1.25, color: "primary.contrastText", fontWeight: 760, whiteSpace: "nowrap" }}
+        >
+          {isBusy ? "求解中…" : "开始求解"}
+        </Button>
+        {hasActiveJob && isBusy && (
+          <Button type="button" onClick={onCancelSolve} sx={{ gridColumn: "1 / -1", width: "100%" }}>
+            取消求解
+          </Button>
+        )}
       </Box>
 
       {formula.length > 0 && (
@@ -1064,6 +1116,7 @@ export default function App() {
               gap: 1.125,
               ml: { xs: 0, sm: "auto" },
               flex: { xs: "1 0 100%", sm: "0 1 auto" },
+              [MOBILE_LAYOUT_QUERY]: { display: "none" },
             }}
           >
             <FormControl size="small" sx={{ minWidth: { xs: 112, sm: 124 } }}>
@@ -1138,11 +1191,17 @@ export default function App() {
           {mobileLayout && (
             <MobileWorkspaceControls
               viewControls={viewportControls}
+              order={order}
               formula={formula}
               playbackIndex={playbackIndex}
               playing={playing}
               speedPreset={speedPreset}
               customSpeedSeconds={customSpeedSeconds}
+              isBusy={isBusy}
+              hasActiveJob={Boolean(jobId)}
+              onOrderChange={changeOrder}
+              onSolve={solve}
+              onCancelSolve={cancelSolve}
               onCopyFormula={copyFormula}
               onPrevious={() => setPlaybackStep(playbackIndex - 1)}
               onNext={() => setPlaybackStep(playbackIndex + 1)}
@@ -1345,12 +1404,12 @@ export default function App() {
                   [MOBILE_LAYOUT_QUERY]: { display: "none" },
                 }}
               >
-                <Box className="formula-actions" sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, minWidth: 0 }}>
-                  <Button type="button" onClick={copyFormula} disabled={!formula.length} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>复制公式</Button>
+                <Box className="formula-actions" sx={{ display: "grid", gridTemplateColumns: formula.length > 0 ? "repeat(4, minmax(0, 1fr))" : "minmax(0, 1fr)", gap: 0.625, minWidth: 0 }}>
+                  <Button type="button" onClick={copyFormula} disabled={!formula.length} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>复制公式</Button>
                   {formula.length > 0 && <>
-                    <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>← 上一步</Button>
-                    <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>下一步 →</Button>
-                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ minWidth: 0, minHeight: 36, px: 0.625, fontSize: ".7rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
+                    <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>← 上一步</Button>
+                    <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>下一步 →</Button>
+                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
                   </>}
                 </Box>
                 {formula.length > 0 && (
