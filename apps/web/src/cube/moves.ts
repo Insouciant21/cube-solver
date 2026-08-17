@@ -135,7 +135,9 @@ const ROTATION: Record<Face | 'x' | 'y' | 'z', { axis: Axis; sign: 1 | -1 }> = {
   R: { axis: 'x', sign: -1 },
   x: { axis: 'x', sign: -1 },
   y: { axis: 'y', sign: -1 },
-  z: { axis: 'z', sign: -1 },
+  // Whole-cube z follows the WCA F direction. Keep it aligned with the API
+  // replay because high-order OLL parity solutions may contain z/z'.
+  z: { axis: 'z', sign: 1 },
 }
 
 function posKey(pos: Vec3): string {

@@ -52,6 +52,20 @@ def test_replay_keeps_front_turn_results_aligned_with_wca_direction() -> None:
     assert [counter_clockwise["R"][index] for index in (0, 3, 6)] == [1, 1, 1]
 
 
+def test_replay_handles_side_oll_parity_orientation() -> None:
+    # This is the upstream 4x4 OLL-parity algorithm. Applying it to a solved
+    # cube creates a legal parity state; rotating that state around z places
+    # the parity edge on the side, which makes the solver prepend z'.
+    oll_parity = (
+        "2Rw2 R2 U2 2Rw2 R2 U2 2Rw R' U2 2Rw R' U2 "
+        "2Rw' R' U2 B2 U 2Rw' R U' B2 U 2Rw R' U R2"
+    ).split()
+    state = replay_moves(4, solved(4), [*oll_parity, "z"])
+    solution = ["z'", *oll_parity]
+
+    assert is_solved_stickers(4, replay_moves(4, state, solution))
+
+
 def test_replay_rejects_wide_layer_beyond_order() -> None:
     with pytest.raises(ValueError):
         replay_moves(2, solved(2), ["3Rw"])

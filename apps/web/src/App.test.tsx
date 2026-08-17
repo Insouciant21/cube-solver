@@ -73,8 +73,7 @@ describe("App", () => {
   it("confirms before replacing an edited cube with another order", async () => {
     render(<App />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "移动记号" }), { target: { value: "R" } });
-    fireEvent.click(screen.getByRole("button", { name: "执行移动" }));
+    fireEvent.click(screen.getByRole("button", { name: /^R$/ }));
     chooseSelect("魔方阶数", "2×2");
 
     expect(screen.getByRole("dialog")).toHaveTextContent("切换阶数会替换当前魔方");
@@ -91,10 +90,7 @@ describe("App", () => {
   it("applies a move and supports undo, redo, and reset", () => {
     render(<App />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "移动记号" }), {
-      target: { value: "R" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "执行移动" }));
+    fireEvent.click(screen.getByRole("button", { name: /^R$/ }));
     expect(screen.getByRole("status")).toHaveTextContent("第 1 次修改");
 
     fireEvent.click(screen.getByRole("button", { name: "撤销" }));
@@ -107,13 +103,13 @@ describe("App", () => {
     expect(screen.getByRole("status")).toHaveTextContent("已复原");
   });
 
-  it("randomly scrambles the current cube without filling the single-move input", () => {
+  it("randomly scrambles the current cube", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "随机打乱魔方" }));
 
     expect(screen.getByRole("status")).toHaveTextContent(/已随机打乱 \d+ 步/);
-    expect(screen.getByRole("textbox", { name: "移动记号" })).toHaveValue("");
+    expect(screen.queryByRole("textbox", { name: "移动记号" })).not.toBeInTheDocument();
   });
 
   it("validates input through the /api/validate endpoint", async () => {
@@ -301,11 +297,13 @@ it("supports custom playback speed and pauses after the final step", async () =>
   fireEvent.click(screen.getByRole("button", { name: "开始求解" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "播放公式" })).toBeInTheDocument());
 
-  chooseSelect("播放速度", "自定义");
-  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuenow", "1");
-  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuemin", "0");
-  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("aria-valuemax", "1");
-  expect(screen.getByRole("slider", { name: "自定义每步秒数" })).toHaveAttribute("step", "0.05");
+  const speedSlider = screen.getByRole("slider", { name: "自定义每步秒数" });
+  expect(speedSlider).toHaveAttribute("aria-valuenow", "0.7");
+  expect(speedSlider).toHaveAttribute("aria-valuemin", "0");
+  expect(speedSlider).toHaveAttribute("aria-valuemax", "1");
+  expect(speedSlider).toHaveAttribute("step", "0.05");
+  fireEvent.change(speedSlider, { target: { value: "1" } });
+  expect(speedSlider).toHaveAttribute("aria-valuenow", "1");
   fireEvent.click(screen.getByRole("button", { name: "播放公式" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "播放公式" })).toBeInTheDocument(), { timeout: 3500 });
   expect(screen.getByRole("button", { name: "第 2 步 U" })).toHaveAttribute("aria-current", "step");
@@ -384,8 +382,7 @@ it("does not apply a solve result after the cube revision changes", async () => 
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "取消求解" })).toBeInTheDocument(),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "移动记号" }), { target: { value: "R" } });
-  fireEvent.click(screen.getByRole("button", { name: "执行移动" }));
+  fireEvent.click(screen.getByRole("button", { name: /^R$/ }));
   resolveEvents?.();
 
   await waitFor(() =>
@@ -414,8 +411,7 @@ it("cancels a stale job returned after the cube changed", async () => {
 
   render(<App />);
   fireEvent.click(screen.getByRole("button", { name: "开始求解" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "移动记号" }), { target: { value: "R" } });
-  fireEvent.click(screen.getByRole("button", { name: "执行移动" }));
+  fireEvent.click(screen.getByRole("button", { name: /^R$/ }));
   resolveSolve?.({
     ok: true,
     json: async () => ({ job_id: "job-late", revision: 0 }),

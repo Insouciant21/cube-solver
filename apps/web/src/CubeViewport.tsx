@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { Box, Button, ButtonGroup, SvgIcon, Typography } from '@mui/material';
+import { Box, Button, ButtonGroup, SvgIcon, Typography } from './kumo-ui';
 import * as THREE from 'three';
 
 import type { CubeState } from './cube/state';
@@ -229,11 +229,12 @@ export default function CubeViewport({
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, canvas, alpha: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, canvas, alpha: false });
     } catch {
       return undefined;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor('#f1f2f4', 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
@@ -251,8 +252,11 @@ export default function CubeViewport({
     const core = new THREE.Mesh(coreGeometry, coreMaterial);
     cube.add(core);
 
-    const stickerGeometry = new THREE.PlaneGeometry(cellSize * 0.91, cellSize * 0.91);
-    const cubieGeometry = new THREE.BoxGeometry(cellSize * 0.9, cellSize * 0.9, cellSize * 0.9);
+    // Keep a dark cubie border around every sticker. A nearly full-size
+    // cubie removes the bright background leaking through the cube gaps,
+    // while the smaller sticker leaves a consistent shadowed edge.
+    const stickerGeometry = new THREE.PlaneGeometry(cellSize * 0.86, cellSize * 0.86);
+    const cubieGeometry = new THREE.BoxGeometry(cellSize * 0.96, cellSize * 0.96, cellSize * 0.96);
     const cubieGroups: CubieGroup[] = [];
     const cubieByKey = new Map<string, CubieGroup>();
     for (let xIndex = 0; xIndex < initialState.order; xIndex += 1) {
@@ -301,7 +305,7 @@ export default function CubeViewport({
         if (!cubie) continue;
         const sticker = new THREE.Mesh(stickerGeometry, material) as unknown as StickerMesh;
         sticker.position.copy(worldPosition).sub(cubie.position);
-        sticker.position.addScaledVector(FACE_NORMAL_VECTORS[face], 0.012);
+        sticker.position.addScaledVector(FACE_NORMAL_VECTORS[face], 0.018);
         sticker.rotation.set(...FACE_ROTATIONS[face]);
         sticker.userData = { face, index };
         cubie.add(sticker);
@@ -633,10 +637,14 @@ export default function CubeViewport({
                 aria-label={`查看 ${face} 面`}
                 title={`查看 ${face} 面`}
                 sx={{
-                  minWidth: { xs: 32, sm: 36 },
-                  minHeight: { xs: 32, sm: 35 },
-                  px: { xs: 0.75, sm: 1 },
-                  py: 0.5,
+                  minWidth: { xs: 38, sm: 42 },
+                  minHeight: { xs: 38, sm: 42 },
+                  width: { xs: 38, sm: 42 },
+                  height: { xs: 38, sm: 42 },
+                  display: 'grid',
+                  placeItems: 'center',
+                  px: 0,
+                  py: 0,
                   color: '#d2e0e4',
                   bgcolor: 'rgb(12 20 27 / 76%)',
                   borderColor: '#3c5662',
@@ -666,7 +674,7 @@ export default function CubeViewport({
               bgcolor: 'rgb(12 20 27 / 76%)',
               borderColor: '#486372',
               fontSize: '.72rem',
-              '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.625 } },
+              '& .kumo-button__start-icon': { mr: { xs: 0, sm: 0.625 } },
               '&:hover': { bgcolor: 'rgb(28 48 57 / 92%)', borderColor: '#8cc8c4' },
             }}
           >
@@ -686,7 +694,7 @@ export default function CubeViewport({
               bgcolor: 'rgb(12 20 27 / 76%)',
               borderColor: '#486372',
               fontSize: '.72rem',
-              '& .MuiButton-startIcon': { mr: { xs: 0, sm: 0.625 } },
+              '& .kumo-button__start-icon': { mr: { xs: 0, sm: 0.625 } },
               '&:hover': { bgcolor: 'rgb(28 48 57 / 92%)', borderColor: '#8cc8c4' },
             }}
           >

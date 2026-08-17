@@ -82,7 +82,7 @@ describe('CubeViewport', () => {
     expect(rotated.orientation).toBeDefined();
     expect(zoomView(rotated, 100).distance).toBe(7.5);
     expect(zoomView(rotated, 0).distance).toBe(3.2);
-    expect(serializeView(DEFAULT_VIEW_TRANSFORM)).toBe('-0.180,0.550,6.600');
+    expect(serializeView(DEFAULT_VIEW_TRANSFORM)).toBe('-0.180,0.550,5.200');
   });
 
   it('animates prime turns along the shortest quarter-turn path', () => {
