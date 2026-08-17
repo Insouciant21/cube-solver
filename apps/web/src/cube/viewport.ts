@@ -53,10 +53,10 @@ export const DEFAULT_VIEW_TRANSFORM: Readonly<ViewTransform> = {
   rotationX: -0.18,
   rotationY: 0.55,
   rotationZ: 0,
-  distance: 6.6,
+  distance: 5.2,
 };
 
-export const FIT_VIEW_DISTANCE = 5.2;
+export const FIT_VIEW_DISTANCE = 5;
 const MIN_VIEW_DISTANCE = 3.2;
 const MAX_VIEW_DISTANCE = 7.5;
 const ORBIT_SENSITIVITY = 0.012;

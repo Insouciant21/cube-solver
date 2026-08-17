@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyMove, parseMove } from "./moves";
-import { createCubeState } from "./state";
+import { createCubeState, isSolved } from "./state";
 
 const orders = [2, 3, 4, 5, 6, 7] as const;
 
@@ -81,6 +81,17 @@ it("keeps front turn results aligned with WCA direction", () => {
 
   expect(leftColumn(clockwise.stickers.R)).toEqual([0, 0, 0]);
   expect(leftColumn(counterClockwise.stickers.R)).toEqual([1, 1, 1]);
+});
+
+it("keeps side OLL parity replay aligned with the solver's z rotation", () => {
+  const ollParity =
+    "2Rw2 R2 U2 2Rw2 R2 U2 2Rw R' U2 2Rw R' U2 " +
+    "2Rw' R' U2 B2 U 2Rw' R U' B2 U 2Rw R' U R2";
+  let state = createCubeState(4);
+  for (const move of `${ollParity} z`.split(" ")) state = applyMove(state, move);
+  for (const move of `z' ${ollParity}`.split(" ")) state = applyMove(state, move);
+
+  expect(isSolved(state)).toBe(true);
 });
 
 

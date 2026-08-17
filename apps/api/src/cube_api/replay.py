@@ -129,7 +129,10 @@ def _apply(stickers: Mapping[str, Sequence[int]], order: int, token: str) -> Sti
         "R": ("x", -1),
         "x": ("x", -1),
         "y": ("y", -1),
-        "z": ("z", -1),
+        # A whole-cube z rotation follows the same WCA direction as F.  This
+        # is important for high-order parity solutions: the upstream solver
+        # uses z/z' to move a side OLL-parity edge into the working position.
+        "z": ("z", 1),
     }[face]
     cells, by_pos = _geometry(order)
     source = {name: list(stickers[name]) for name in FACE_KEYS}

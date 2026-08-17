@@ -1,31 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CaretLeft, CaretRight, Pause, Play } from "@phosphor-icons/react";
 import {
   Alert,
   Box,
   Button,
-  ButtonGroup,
   Chip,
-  CssBaseline,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
-  FormControl,
-  InputLabel,
   MenuItem,
   Paper,
   Select,
   Slider,
   Stack,
   TextField,
-  ThemeProvider,
   Typography,
-  createTheme,
-  useMediaQuery,
-} from "@mui/material";
+} from "./kumo-ui";
 import PerfectScrollbar from "perfect-scrollbar";
-import CubeViewport, { type CubeAnimation, type CubeFace, type ViewControls } from "./CubeViewport";
+import CubeViewport, { type CubeAnimation } from "./CubeViewport";
 import {
   MAX_HISTORY,
   applyMove,
@@ -52,79 +46,11 @@ import "./cube/moves";
 import "perfect-scrollbar/css/perfect-scrollbar.css";
 import "./index.css";
 
-const theme = createTheme({
-  breakpoints: {
-    values: { xs: 0, sm: 600, md: 1051, lg: 1280, xl: 1920 },
-  },
-  palette: {
-    mode: "dark",
-    primary: { main: "#8cc8c4", light: "#b6e3dc", dark: "#4f9b94", contrastText: "#071014" },
-    background: { default: "#0b1116", paper: "#111a21" },
-    text: { primary: "#edf2f5", secondary: "#91a4ae" },
-    divider: "#22313b",
-    warning: { main: "#e4b878" },
-  },
-  typography: {
-    fontFamily: 'Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif',
-    h2: { fontSize: "1.06rem", fontWeight: 700, letterSpacing: "-.01em" },
-    h3: { fontSize: ".93rem", fontWeight: 700 },
-    body2: { lineHeight: 1.5 },
-  },
-  shape: { borderRadius: 12 },
-  components: {
-    MuiCssBaseline: {
-      styleOverrides: {
-        html: { minWidth: 320, backgroundColor: "#0b1116" },
-        body: { minWidth: 320, minHeight: "100vh", backgroundColor: "#0b1116" },
-        "#root": { minHeight: "100vh" },
-      },
-    },
-    MuiPaper: {
-      defaultProps: { elevation: 0 },
-      styleOverrides: {
-        root: { backgroundImage: "none", border: "1px solid #22313b" },
-      },
-    },
-    MuiButton: {
-      defaultProps: { variant: "outlined" },
-      styleOverrides: {
-        root: {
-          minHeight: 42,
-          borderRadius: 8,
-          borderColor: "#3b5361",
-          color: "#dce6eb",
-          fontWeight: 650,
-          textTransform: "none",
-        },
-      },
-    },
-    MuiOutlinedInput: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          backgroundColor: "#0e171e",
-          "& .MuiOutlinedInput-notchedOutline": { borderColor: "#2b3b47" },
-          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#5c7b89" },
-          "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#66d9c1" },
-        },
-      },
-    },
-    MuiInputLabel: {
-      styleOverrides: { root: { color: "#91a4ae", "&.Mui-focused": { color: "#8cc8c4" } } },
-    },
-    MuiChip: {
-      styleOverrides: {
-        root: { borderRadius: 99, fontWeight: 650 },
-      },
-    },
-  },
-});
-
 const ORDERS = [2, 3, 4, 5, 6, 7] as const;
 const COLORS = ["白", "黄", "绿", "蓝", "橙", "红"] as const;
-const MOBILE_MEDIA_QUERY = "(max-width: 760px)";
-const MOBILE_LAYOUT_QUERY = "@media (max-width: 760px)";
-const DESKTOP_LAYOUT_QUERY = "@media (min-width: 761px)";
+const MOBILE_LAYOUT_QUERY = "@media (max-width: 820px)";
+const DESKTOP_LAYOUT_QUERY = "@media (min-width: 821px)";
+const MOBILE_MEDIA_QUERY = "(max-width: 820px)";
 const FACE_LABELS: Record<Face, string> = {
   U: "U（上）",
   D: "D（下）",
@@ -139,7 +65,6 @@ const DEFAULT_TOP: Face = "U";
 type SolveStatus = "idle" | "queued" | "running" | "downloading" | "reducing" | "solving" | "searching" | "verifying" | "completed" | "failed" | "cancelled";
 type SolveEvent = { name: string; data: Record<string, unknown> };
 type ValidationError = { code?: unknown; message?: unknown };
-type SpeedPreset = "slow" | "standard" | "fast" | "custom";
 type StatusJob = {
   job_id: string;
   order: number;
@@ -185,11 +110,19 @@ const STATUS_TOKEN_STORAGE_KEY = "613-cube-status-token";
 const CUSTOM_SPEED_MIN_SECONDS = 0;
 const CUSTOM_SPEED_MAX_SECONDS = 1;
 const CUSTOM_SPEED_STEP_SECONDS = 0.05;
-const PRESET_SPEEDS: Record<Exclude<SpeedPreset, "custom">, number> = {
-  slow: 1000,
-  standard: 700,
-  fast: 350,
-};
+
+const QUICK_MOVE_FACES = ["U", "R", "F", "D", "L", "B"] as const;
+
+function quickMoveNotations(order: number): string[] {
+  const moves = QUICK_MOVE_FACES.flatMap((face) => [face, face + "'"]);
+  for (let width = 2; width <= Math.floor(order / 2); width += 1) {
+    const prefix = width === 2 ? "" : String(width);
+    for (const face of QUICK_MOVE_FACES) {
+      moves.push(prefix + face + "w", prefix + face + "w'");
+    }
+  }
+  return moves;
+}
 
 function faceLabel(face: Face): string {
   return `${FACE_LABELS[face]}面`;
@@ -197,179 +130,6 @@ function faceLabel(face: Face): string {
 
 function formatCustomSpeed(seconds: number): string {
   return `${Number(seconds.toFixed(2))} 秒`;
-}
-
-interface MobileWorkspaceControlsProps {
-  viewControls: ViewControls | null;
-  order: number;
-  formula: string[];
-  playbackIndex: number;
-  playing: boolean;
-  speedPreset: SpeedPreset;
-  customSpeedSeconds: number;
-  isBusy: boolean;
-  hasActiveJob: boolean;
-  onOrderChange: (value: string) => void;
-  onSolve: () => void;
-  onCancelSolve: () => void;
-  onCopyFormula: () => void;
-  onPrevious: () => void;
-  onNext: () => void;
-  onTogglePlayback: () => void;
-  onSpeedPresetChange: (preset: SpeedPreset) => void;
-  onCustomSpeedChange: (seconds: number) => void;
-}
-
-function MobileWorkspaceControls({
-  viewControls,
-  order,
-  formula,
-  playbackIndex,
-  playing,
-  speedPreset,
-  customSpeedSeconds,
-  isBusy,
-  hasActiveJob,
-  onOrderChange,
-  onSolve,
-  onCancelSolve,
-  onCopyFormula,
-  onPrevious,
-  onNext,
-  onTogglePlayback,
-  onSpeedPresetChange,
-  onCustomSpeedChange,
-}: MobileWorkspaceControlsProps) {
-  const quickFaces: CubeFace[] = ["F", "B", "U", "D", "L", "R"];
-  return (
-    <Box
-      className="mobile-workspace-controls"
-      aria-label="移动端工作区控制"
-      sx={{
-        display: "grid",
-        gridArea: "mobile-controls",
-        gap: 1,
-        minWidth: 0,
-        p: { xs: 1.25, sm: 0 },
-        borderBottom: "1px solid #263945",
-        bgcolor: "#0d171e",
-      }}
-    >
-      <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.75, minWidth: 0 }}>
-        <Typography component="span" sx={{ display: { xs: "none", sm: "inline" }, color: "#8fa7b2", fontSize: ".7rem", fontWeight: 700, whiteSpace: "nowrap" }}>快速对准</Typography>
-        <ButtonGroup variant="outlined" size="small" aria-label="六面快速视角" sx={{ minWidth: 0, flexShrink: 1 }}>
-          {quickFaces.map((face) => (
-            <Button
-              key={face}
-              type="button"
-              onClick={() => viewControls?.face(face)}
-              aria-label={`查看 ${face} 面`}
-              title={`查看 ${face} 面`}
-              sx={{ minWidth: 31, minHeight: 32, px: 0.75, py: 0.5, color: "#d2e0e4", bgcolor: "rgb(12 20 27 / 76%)", borderColor: "#3c5662", fontSize: ".72rem", fontWeight: 760 }}
-            >
-              {face}
-            </Button>
-          ))}
-        </ButtonGroup>
-        <Button type="button" aria-label="重置视角" onClick={() => viewControls?.reset()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".72rem" }}>↻</Button>
-        <Button type="button" aria-label="适应窗口" onClick={() => viewControls?.fit()} sx={{ minHeight: 32, minWidth: 38, px: 0.75, fontSize: ".82rem" }}>⛶</Button>
-      </Box>
-
-      <Box
-        className="mobile-solve-controls"
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(112px, auto)",
-          alignItems: "center",
-          gap: 0.75,
-          minWidth: 0,
-        }}
-      >
-        <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
-          <InputLabel id="mobile-order-select-label">魔方阶数</InputLabel>
-          <Select
-            labelId="mobile-order-select-label"
-            id="mobile-order-select"
-            label="魔方阶数"
-            aria-label="魔方阶数"
-            value={order}
-            onChange={(event) => onOrderChange(String(event.target.value))}
-          >
-            {ORDERS.map((value) => <MenuItem key={value} value={value}>{value}×{value}</MenuItem>)}
-          </Select>
-        </FormControl>
-        <Button
-          variant="contained"
-          color="primary"
-          type="button"
-          onClick={onSolve}
-          disabled={isBusy}
-          sx={{ width: "100%", minWidth: 112, px: 1.25, color: "primary.contrastText", fontWeight: 760, whiteSpace: "nowrap" }}
-        >
-          {isBusy ? "求解中…" : "开始求解"}
-        </Button>
-        {hasActiveJob && isBusy && (
-          <Button type="button" onClick={onCancelSolve} sx={{ gridColumn: "1 / -1", width: "100%" }}>
-            取消求解
-          </Button>
-        )}
-      </Box>
-
-      {formula.length > 0 && (
-        <Box
-          className="mobile-playback-controls"
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: 1,
-            minWidth: 0,
-            pt: 1,
-            borderTop: "1px solid #22313b",
-          }}
-        >
-          <Box className="formula-actions" sx={{ display: "flex", flexWrap: "nowrap", gap: 0.75, width: "100%", minWidth: 0 }}>
-            <Button type="button" onClick={onCopyFormula} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>复制公式</Button>
-            <Button type="button" aria-label="上一步" onClick={onPrevious} disabled={playbackIndex < 0} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>← 上一步</Button>
-            <Button type="button" aria-label="下一步" onClick={onNext} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>下一步 →</Button>
-            <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={onTogglePlayback} sx={{ flex: "1 1 0", minWidth: 0, minHeight: 42, px: 1.25, fontSize: ".78rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
-          </Box>
-          <FormControl className="mobile-speed-select" size="small" sx={{ flex: "1 1 100%", width: "100%" }}>
-            <InputLabel id="mobile-speed-select-label">播放速度</InputLabel>
-            <Select
-              labelId="mobile-speed-select-label"
-              id="mobile-speed-select"
-              label="播放速度"
-              aria-label="播放速度"
-              value={speedPreset}
-              onChange={(event) => onSpeedPresetChange(event.target.value as SpeedPreset)}
-              renderValue={(value) => ({ slow: "慢速", standard: "标准", fast: "快速", custom: "自定义" }[value as SpeedPreset])}
-            >
-              <MenuItem value="slow">慢速（1.0 秒/步）</MenuItem>
-              <MenuItem value="standard">标准（0.7 秒/步）</MenuItem>
-              <MenuItem value="fast">快速（0.35 秒/步）</MenuItem>
-              <MenuItem value="custom">自定义</MenuItem>
-            </Select>
-          </FormControl>
-          {speedPreset === "custom" && (
-            <Box className="mobile-custom-speed" sx={{ display: "grid", flex: "1 1 100%", width: "100%", gap: 0.375, px: 0.5 }}>
-              <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem" }}>每步 {formatCustomSpeed(customSpeedSeconds)}</Typography>
-              <Slider
-                aria-label="移动端自定义每步秒数"
-                value={customSpeedSeconds}
-                min={CUSTOM_SPEED_MIN_SECONDS}
-                max={CUSTOM_SPEED_MAX_SECONDS}
-                step={CUSTOM_SPEED_STEP_SECONDS}
-                valueLabelDisplay="auto"
-                valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
-                onChange={(_, value) => onCustomSpeedChange(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
-              />
-            </Box>
-          )}
-        </Box>
-      )}
-    </Box>
-  );
 }
 
 function readStoredCube(key: string): CubeState | null {
@@ -487,6 +247,24 @@ function formatStatusTime(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function useMediaQuery(query: string): boolean {
+  const getMatches = () => typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(query).matches
+    : false;
+  const [matches, setMatches] = useState(getMatches);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, [query]);
+
+  return matches;
+}
+
 function statusPhaseLabel(phase: string): string {
   return STATUS_LABELS[phase as SolveStatus] ?? phase;
 }
@@ -566,6 +344,7 @@ function StatusPage() {
   return (
     <Box
       component="main"
+      className="status-page"
       sx={{
         width: "min(1100px, 100%)",
         mx: "auto",
@@ -574,24 +353,32 @@ function StatusPage() {
         pb: { xs: 3.75, sm: 5.25 },
       }}
     >
-      <Box component="header" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, mb: 2.5 }}>
-        <Typography component="p" className="eyebrow" variant="overline" sx={{ m: 0, color: "#7893a2", fontSize: ".67rem", fontWeight: 750, letterSpacing: ".14em" }}>
-          613 CODING · 魔方公式工作台
-        </Typography>
-        <Button component="a" href="/" size="small" sx={{ flexShrink: 0 }}>返回工作台</Button>
+      <Box component="header" className="status-page-header">
+        <Box className="status-page-brand">
+          <Typography component="p" className="status-page-eyebrow">613 CODING · 魔方公式工作台</Typography>
+          <Typography component="p" className="status-page-caption">/status · 实时后端监控</Typography>
+        </Box>
+        <Button component="a" href="/" size="small" className="status-back-button">返回工作台</Button>
       </Box>
 
-      <Paper component="section" aria-labelledby="status-page-title" sx={{ p: { xs: 2, sm: 3 } }}>
-        <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em" }}>
-          系统监控
-        </Typography>
-        <Typography id="status-page-title" component="h1" variant="h2" sx={{ fontSize: "1.35rem", mb: 0.75 }}>后端状态</Typography>
-        <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".8rem" }}>
-          查看求解器注册状态、当前任务和 FIFO 排队情况。状态接口需要 Bearer 令牌。
-        </Typography>
+      <Paper component="section" className="status-shell" aria-labelledby="status-page-title" sx={{ p: 0 }}>
+        <Box className="status-intro">
+          <Box className="status-intro-copy">
+            <Typography component="p" className="status-section-kicker">系统监控</Typography>
+            <Typography id="status-page-title" component="h1" className="status-page-title">后端状态</Typography>
+            <Typography component="p" className="status-page-description">
+              查看求解器注册状态、当前任务和 FIFO 排队情况。状态接口需要 Bearer 令牌。
+            </Typography>
+          </Box>
+          <Box className={`status-access-badge ${statusToken ? "status-access-badge--connected" : "status-access-badge--locked"}`}>
+            <Box className="status-access-dot" aria-hidden="true" />
+            <Typography component="span">{statusToken ? "已授权" : "需要授权"}</Typography>
+          </Box>
+        </Box>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2.5 }}>
+        <Box className="status-auth-form">
           <TextField
+            className="status-token-field"
             fullWidth
             size="small"
             type="password"
@@ -600,57 +387,91 @@ function StatusPage() {
             onChange={(event) => setDraftToken(event.target.value)}
             onKeyDown={(event) => { if (event.key === "Enter") connect(); }}
           />
-          <Button variant="contained" color="primary" onClick={connect} disabled={!draftToken.trim() || statusLoading} sx={{ flexShrink: 0, color: "primary.contrastText" }}>
-            {statusLoading && !backendStatus ? "连接中…" : "连接状态"}
-          </Button>
-          {statusToken && <Button onClick={disconnect} sx={{ flexShrink: 0 }}>退出授权</Button>}
-        </Stack>
+          <Box className="status-auth-actions">
+            <Button variant="contained" color="primary" onClick={connect} disabled={!draftToken.trim() || statusLoading} sx={{ color: "primary.contrastText" }}>
+              {statusLoading && !backendStatus ? "连接中…" : "连接状态"}
+            </Button>
+            {statusToken && <Button onClick={disconnect}>退出授权</Button>}
+          </Box>
+        </Box>
 
-        {statusError && <Alert severity="error" sx={{ mt: 2 }}>{statusError}</Alert>}
+        {statusError && <Alert className="status-error" severity="error">{statusError}</Alert>}
+
+        {!backendStatus && !statusError && (
+          <Box className="status-auth-placeholder">
+            <Typography component="p" className="status-placeholder-title">输入令牌以查看实时数据</Typography>
+            <Typography component="p" className="status-placeholder-copy">
+              连接后可查看求解器状态、任务统计与等待队列。
+            </Typography>
+          </Box>
+        )}
 
         {backendStatus && (
-          <Box sx={{ mt: 3 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap sx={{ flexWrap: "wrap" }} aria-label="后端状态摘要">
+          <Box className="status-dashboard">
+            <Box className="status-summary-grid" aria-label="后端状态摘要">
               {[
-                ["排队中", backendStatus.jobs.queued],
-                ["运行中", backendStatus.jobs.running],
-                ["已完成", backendStatus.jobs.completed],
-                ["失败", backendStatus.jobs.failed],
-                ["已取消", backendStatus.jobs.cancelled],
-              ].map(([label, value]) => (
-                <Box key={label} sx={{ flex: "1 1 110px", p: 1.25, border: "1px solid #263945", borderRadius: 1, bgcolor: "#0d171e" }}>
-                  <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".7rem" }}>{label}</Typography>
-                  <Typography component="p" sx={{ m: 0.25, color: "primary.main", fontSize: "1.25rem", fontVariantNumeric: "tabular-nums", fontWeight: 750 }}>{value}</Typography>
+                { label: "任务总数", value: backendStatus.jobs.total, tone: "total" },
+                { label: "排队中", value: backendStatus.jobs.queued, tone: "queued" },
+                { label: "运行中", value: backendStatus.jobs.running, tone: "running" },
+                { label: "已完成", value: backendStatus.jobs.completed, tone: "completed" },
+                { label: "失败", value: backendStatus.jobs.failed, tone: "failed" },
+                { label: "已取消", value: backendStatus.jobs.cancelled, tone: "cancelled" },
+              ].map(({ label, value, tone }) => (
+                <Box key={label} className={`status-stat status-stat--${tone}`}>
+                  <Typography component="p" className="status-stat-label">{label}</Typography>
+                  <Typography component="p" className="status-stat-value">{value}</Typography>
                 </Box>
               ))}
-            </Stack>
-
-            <Box sx={{ mt: 2, p: 1.5, border: "1px solid #263945", borderRadius: 1, bgcolor: "#0d171e" }}>
-              <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".75rem" }}>
-                求解器：{backendStatus.solver.registered ? "已注册" : "未注册"} · 队列长度：{backendStatus.solver.queue_length} · 更新于 {formatStatusTime(backendStatus.generated_at)}
-              </Typography>
-              {backendStatus.active ? (
-                <Typography component="p" sx={{ m: "0.625rem 0 0", color: "#dce6eb", fontSize: ".8rem" }}>
-                  当前任务：{backendStatus.active.job_id} · {backendStatus.active.order}×{backendStatus.active.order} · {statusPhaseLabel(backendStatus.active.phase)}
-                </Typography>
-              ) : (
-                <Typography component="p" sx={{ m: "0.625rem 0 0", color: "text.secondary", fontSize: ".8rem" }}>当前没有运行中的任务</Typography>
-              )}
             </Box>
 
-            <Box sx={{ mt: 2 }}>
-              <Typography component="h2" variant="h3" sx={{ mb: 1 }}>等待队列</Typography>
-              {backendStatus.queue.length === 0 ? (
-                <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".8rem" }}>当前没有排队任务</Typography>
+            <Box className="status-system-card">
+              <Box className="status-system-item">
+                <Typography component="p" className="status-field-label">求解器</Typography>
+                <Box className="status-system-state">
+                  <Box className={`status-state-dot ${backendStatus.solver.registered ? "status-state-dot--ok" : "status-state-dot--danger"}`} aria-hidden="true" />
+                  <Typography component="p" className="status-system-value">{backendStatus.solver.registered ? "已注册" : "未注册"}</Typography>
+                </Box>
+                <Typography component="p" className="status-system-meta">队列长度 {backendStatus.solver.queue_length}</Typography>
+              </Box>
+              <Box className="status-system-item">
+                <Typography component="p" className="status-field-label">当前任务</Typography>
+              {backendStatus.active ? (
+                <Typography component="p" className="status-system-value status-system-value--compact">
+                  {backendStatus.active.order}×{backendStatus.active.order} · {statusPhaseLabel(backendStatus.active.phase)}
+                </Typography>
               ) : (
-                <Stack spacing={0.875}>
+                <Typography component="p" className="status-system-value status-system-value--muted">当前没有运行中的任务</Typography>
+              )}
+                {backendStatus.active && <Typography component="p" className="status-system-meta status-system-job-id">{backendStatus.active.job_id}</Typography>}
+              </Box>
+              <Typography component="p" className="status-system-footer">最近更新 · {formatStatusTime(backendStatus.generated_at)}</Typography>
+            </Box>
+
+            <Box className="status-queue-section">
+              <Box className="status-section-heading">
+                <Box>
+                  <Typography component="p" className="status-field-label">任务调度</Typography>
+                  <Typography component="h2" className="status-section-title">等待队列</Typography>
+                </Box>
+                <Typography component="span" className="status-queue-count">{backendStatus.queue.length} 个任务</Typography>
+              </Box>
+              {backendStatus.queue.length === 0 ? (
+                <Box className="status-empty-state">
+                  <Typography component="p" className="status-empty-title">队列为空</Typography>
+                  <Typography component="p" className="status-empty-copy">当前没有排队任务</Typography>
+                </Box>
+              ) : (
+                <Box className="status-queue-list">
                   {backendStatus.queue.map((job) => (
-                    <Box key={job.job_id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, p: 1.25, border: "1px solid #263945", borderRadius: 1, bgcolor: "#111a21" }}>
-                      <Typography component="span" sx={{ color: "primary.main", fontSize: ".8rem", fontVariantNumeric: "tabular-nums" }}>#{job.position} · {job.job_id}</Typography>
-                      <Typography component="span" sx={{ color: "text.secondary", fontSize: ".76rem", whiteSpace: "nowrap" }}>{job.order}×{job.order} · {statusPhaseLabel(job.phase)}</Typography>
+                    <Box key={job.job_id} className="status-queue-job">
+                      <Box className="status-job-position">#{job.position ?? "—"}</Box>
+                      <Box className="status-job-main">
+                        <Typography component="span" className="status-job-id">{job.job_id}</Typography>
+                        <Typography component="span" className="status-job-meta">{job.order}×{job.order} · {statusPhaseLabel(job.phase)}</Typography>
+                      </Box>
                     </Box>
                   ))}
-                </Stack>
+                </Box>
               )}
             </Box>
           </Box>
@@ -661,11 +482,11 @@ function StatusPage() {
 }
 
 export default function App() {
+  const isMobileViewport = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [cube, setCube] = useState<CubeState>(loadCube);
   const [order, setOrder] = useState(() => cube.order);
   const [selectedColor, setSelectedColor] = useState(0);
   const [viewFacing, setViewFacing] = useState<ViewFacing>(() => facingFaces(DEFAULT_VIEW_TRANSFORM));
-  const [move, setMove] = useState("");
   const [message, setMessage] = useState("已复原 · 第 0 次修改");
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [validating, setValidating] = useState(false);
@@ -676,13 +497,13 @@ export default function App() {
   const [playbackIndex, setPlaybackIndex] = useState(-1);
   const [playbackState, setPlaybackState] = useState<CubeState | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [speedPreset, setSpeedPreset] = useState<SpeedPreset>("standard");
-  const [customSpeedSeconds, setCustomSpeedSeconds] = useState(1);
+  const [customSpeedSeconds, setCustomSpeedSeconds] = useState(0.7);
   const [playbackAnimation, setPlaybackAnimation] = useState<CubeAnimation | null>(null);
   const [pendingOrder, setPendingOrder] = useState<number | null>(null);
-  const [viewportControls, setViewportControls] = useState<ViewControls | null>(null);
-  const mobileLayout = useMediaQuery(MOBILE_MEDIA_QUERY, { noSsr: true });
-  const formulaScrollbarEnabled = useMediaQuery(theme.breakpoints.up("sm"), { noSsr: true });
+  // Keep the formula viewport self-contained at every breakpoint. This is
+  // important on mobile: advancing a step must never scroll the document
+  // away from the 3D model.
+  const formulaScrollbarEnabled = true;
   const cancelledJobIds = useRef(new Set<string>());
   const activeJobRef = useRef<string | null>(null);
   const currentRevisionRef = useRef(cube.revision);
@@ -693,10 +514,7 @@ export default function App() {
   const formulaStepRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const formulaListRef = useRef<HTMLOListElement | null>(null);
   const perfectScrollbarRef = useRef<PerfectScrollbar | null>(null);
-  const viewportControlsRef = useRef<ViewControls | null>(null);
-  const playbackDelayMs = speedPreset === "custom"
-    ? Math.round(customSpeedSeconds * 1000)
-    : PRESET_SPEEDS[speedPreset];
+  const playbackDelayMs = Math.round(customSpeedSeconds * 1000);
 
   useEffect(() => {
     try {
@@ -858,17 +676,6 @@ export default function App() {
     );
   };
 
-  const applyNotation = () => {
-    if (!move.trim()) return;
-    try {
-      const notation = move.trim();
-      announce(applyMove(cube, notation), `已执行 ${notation}`, notation);
-      setMove("");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "移动记号无效");
-    }
-  };
-
   const randomize = () => {
     const notation = randomScrambleString(cube.order);
     const randomized = applyMoves(cube, notation);
@@ -887,6 +694,13 @@ export default function App() {
   const undoMove = () => announce(undo(cube), "已撤销");
   const redoMove = () => announce(redo(cube), "已重做");
   const reset = () => announce(resetCube(cube), "已复原");
+  const applyQuickMove = (notation: string) => {
+    try {
+      announce(applyMove(cube, notation), `已执行 ${notation}`, notation);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "移动记号无效");
+    }
+  };
   const copyFormula = async () => {
     try {
       await navigator.clipboard?.writeText(formula.join(" "));
@@ -1008,76 +822,131 @@ export default function App() {
   const visibleCube = playbackState ?? cube;
   const isBusy = solveStatus !== "idle" && solveStatus !== "completed" && solveStatus !== "failed" && solveStatus !== "cancelled";
   const handleViewChange = useCallback((nextFacing: ViewFacing) => setViewFacing(nextFacing), []);
-  const handleViewControlsReady = useCallback((controls: ViewControls | null) => {
-    viewportControlsRef.current = controls;
-    setViewportControls(controls);
-  }, []);
+  const statusTone = isBusy ? "working" : solveStatus === "completed" ? "success" : solveStatus === "failed" ? "danger" : "neutral";
+  const formulaProgress = formula.length > 0
+    ? `${String(Math.max(0, playbackIndex + 1)).padStart(2, "0")} / ${String(formula.length).padStart(2, "0")}`
+    : "等待";
+
+  const renderSolveControls = (idPrefix: string) => (
+    <>
+      <Box className="order-control">
+        <Typography component="span" className="order-control-label">魔方阶数</Typography>
+        <Select
+          id={`${idPrefix}-order-select`}
+          label="魔方阶数"
+          aria-label="魔方阶数"
+          value={order}
+          onChange={(event) => changeOrder(String(event.target.value))}
+        >
+          {ORDERS.map((value) => <MenuItem key={value} value={value}>{value}×{value}</MenuItem>)}
+        </Select>
+      </Box>
+      <Button
+        variant="contained"
+        color="primary"
+        type="button"
+        onClick={solve}
+        disabled={isBusy}
+        sx={{ color: "primary.contrastText", fontWeight: 760 }}
+      >
+        {isBusy ? "求解中…" : "开始求解"}
+      </Button>
+      {jobId && isBusy && <Button type="button" onClick={cancelSolve}>取消求解</Button>}
+    </>
+  );
+
+  const renderMobilePlaybackControls = () => (
+    <>
+      <Button className="mobile-copy-button" type="button" onClick={copyFormula} disabled={!formula.length}>复制公式</Button>
+      <Box className="mobile-custom-speed-control">
+        <Typography component="p">每步 {formatCustomSpeed(customSpeedSeconds)}</Typography>
+        <Slider
+          aria-label="移动端每步秒数"
+          value={customSpeedSeconds}
+          min={CUSTOM_SPEED_MIN_SECONDS}
+          max={CUSTOM_SPEED_MAX_SECONDS}
+          step={CUSTOM_SPEED_STEP_SECONDS}
+          valueLabelDisplay="auto"
+          valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
+          onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
+        />
+      </Box>
+    </>
+  );
+
+  const renderPlayerButtons = () => (
+    <>
+      <Button className="formula-player-button" type="button" aria-label="上一步" title="上一步" disabled={playbackIndex < 0} onClick={() => setPlaybackStep(playbackIndex - 1)}>
+        <CaretLeft size={22} weight="bold" aria-hidden="true" />
+      </Button>
+      <Button className="formula-player-button formula-player-button--play" type="button" aria-label={playing ? "暂停播放" : "播放公式"} title={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback}>
+        {playing ? <Pause size={22} weight="fill" aria-hidden="true" /> : <Play size={22} weight="fill" aria-hidden="true" />}
+      </Button>
+      <Button className="formula-player-button" type="button" aria-label="下一步" title="下一步" disabled={playbackIndex >= formula.length - 1} onClick={() => setPlaybackStep(playbackIndex + 1)}>
+        <CaretRight size={22} weight="bold" aria-hidden="true" />
+      </Button>
+    </>
+  );
 
   if (typeof window !== "undefined" && window.location.pathname.replace(/\/+$/, "") === "/status") {
     return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <StatusPage />
-      </ThemeProvider>
+      <StatusPage />
     );
   }
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
+    <Box
         component="main"
         className={`app-shell${formula.length ? " has-formula" : ""}`}
         sx={{
-          width: "min(1560px, 100%)",
+          width: "100%",
           mx: "auto",
-          px: { xs: 1.5, sm: "clamp(14px, 4vw, 58px)" },
-          pt: { xs: 2.375, sm: 3.5 },
+          px: 0,
+          pt: 0,
           pb: { xs: 3.75, sm: 5.25 },
-          ...(formula.length > 0 && {
-            [DESKTOP_LAYOUT_QUERY]: {
-              display: "flex",
-              minHeight: 0,
-              height: "100vh",
-              flexDirection: "column",
-              overflow: "hidden",
-            },
-          }),
         }}
       >
         <Box
           component="header"
           className="topbar"
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexDirection: "row",
-            gap: { xs: 0, sm: 3.5 },
-            pb: 0.875,
+            display: "block",
           }}
         >
-          <Typography
-            component="p"
-            className="eyebrow"
-            variant="overline"
-            sx={{
-              display: "block",
-              m: 0,
-              color: "#7893a2",
-              fontSize: ".67rem",
-              fontWeight: 750,
-              letterSpacing: ".14em",
-              lineHeight: 1.5,
-            }}
-          >
-            613 CODING · 魔方公式工作台
-          </Typography>
+          <Box className="topbar-inner">
+            <Box component="a" href="#cube-panel" className="brand-lockup" aria-label="回到 613 CODING 魔方公式工作台">
+              <Typography component="span" className="brand-title">613 CODING · 魔方公式工作台</Typography>
+            </Box>
+            <Box className="task-meta">
+              <Box component="span" className={`status-pill status-pill--${statusTone}`} role="status" aria-live="polite">
+                {message}
+              </Box>
+              <Box className="task-meta-copy">
+                <Typography component="span" className="eyebrow">当前任务</Typography>
+                <Typography component="strong" className="task-title">{jobId ? `任务 ${jobId}` : STATUS_LABELS[solveStatus]}</Typography>
+              </Box>
+            </Box>
+            <Box className="header-spacer" />
+            {!isMobileViewport && (
+              <Box
+                className="desktop-header-actions"
+                aria-label="求解控制"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  flexShrink: 0,
+                  [MOBILE_LAYOUT_QUERY]: { display: "none" },
+                }}
+              >
+                {renderSolveControls("header")}
+              </Box>
+            )}
+          </Box>
         </Box>
 
         <Box
           className="status-line"
-          role="status"
           aria-live="polite"
           sx={{
             display: "flex",
@@ -1106,44 +975,6 @@ export default function App() {
           <Typography component="span" sx={{ color: "inherit", fontSize: "inherit" }}>{message}</Typography>
           {progress && progress !== message && <Typography component="span" sx={{ color: "inherit", fontSize: "inherit" }}>· {progress}</Typography>}
           {jobId && <Typography component="span" className="job-id" sx={{ color: "#6f8490", fontSize: "inherit", fontVariantNumeric: "tabular-nums" }}>任务 {jobId}</Typography>}
-          <Box
-            className="status-actions"
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              flexWrap: "wrap",
-              justifyContent: { xs: "flex-start", sm: "flex-end" },
-              gap: 1.125,
-              ml: { xs: 0, sm: "auto" },
-              flex: { xs: "1 0 100%", sm: "0 1 auto" },
-              [MOBILE_LAYOUT_QUERY]: { display: "none" },
-            }}
-          >
-            <FormControl size="small" sx={{ minWidth: { xs: 112, sm: 124 } }}>
-              <InputLabel id="order-select-label">魔方阶数</InputLabel>
-              <Select
-                labelId="order-select-label"
-                id="order-select"
-                label="魔方阶数"
-                aria-label="魔方阶数"
-                value={order}
-                onChange={(event) => changeOrder(String(event.target.value))}
-              >
-                {ORDERS.map((value) => <MenuItem key={value} value={value}>{value}×{value}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <Button
-              variant="contained"
-              color="primary"
-              type="button"
-              onClick={solve}
-              disabled={isBusy}
-              sx={{ color: "primary.contrastText", fontWeight: 760 }}
-            >
-              {isBusy ? "求解中…" : "开始求解"}
-            </Button>
-            {jobId && isBusy && <Button type="button" onClick={cancelSolve}>取消求解</Button>}
-          </Box>
         </Box>
 
         <Box
@@ -1153,7 +984,7 @@ export default function App() {
             gridTemplateColumns: "minmax(0, 1fr)",
             alignItems: "start",
             gap: 2.25,
-            pt: { xs: 1.5, sm: 3 },
+            pt: { xs: 0, sm: 2.25 },
             [MOBILE_LAYOUT_QUERY]: {
               gridTemplateColumns: "minmax(0, 1fr)",
               gridTemplateAreas: '"workspace"',
@@ -1175,41 +1006,44 @@ export default function App() {
               [MOBILE_LAYOUT_QUERY]: {
                 display: "grid",
                 gridArea: "workspace",
-                gridTemplateColumns: "minmax(0, 1.65fr) minmax(120px, .85fr)",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                 gridTemplateAreas: '"mobile-controls mobile-controls" "cube solution" "editor editor" "control control"',
                 columnGap: 0.875,
                 rowGap: 0,
                 minWidth: 0,
-                p: 1.25,
-                border: "1px solid #263945",
-                borderRadius: 1.5,
-                bgcolor: "#111a21",
-                overflow: "hidden",
+                p: 0,
+                border: 0,
+                borderRadius: 0,
+                bgcolor: "transparent",
+                overflow: "visible",
               },
             }}
           >
-          {mobileLayout && (
-            <MobileWorkspaceControls
-              viewControls={viewportControls}
-              order={order}
-              formula={formula}
-              playbackIndex={playbackIndex}
-              playing={playing}
-              speedPreset={speedPreset}
-              customSpeedSeconds={customSpeedSeconds}
-              isBusy={isBusy}
-              hasActiveJob={Boolean(jobId)}
-              onOrderChange={changeOrder}
-              onSolve={solve}
-              onCancelSolve={cancelSolve}
-              onCopyFormula={copyFormula}
-              onPrevious={() => setPlaybackStep(playbackIndex - 1)}
-              onNext={() => setPlaybackStep(playbackIndex + 1)}
-              onTogglePlayback={togglePlayback}
-              onSpeedPresetChange={setSpeedPreset}
-              onCustomSpeedChange={setCustomSpeedSeconds}
-            />
-          )}
+          <Box
+            className="mobile-solve-controls mobile-workspace-controls"
+            aria-label="求解控制"
+            sx={{
+              display: "none",
+              [MOBILE_LAYOUT_QUERY]: {
+                display: "grid",
+                gridArea: "mobile-controls",
+                alignItems: "center",
+                gap: 1,
+                minWidth: 0,
+                px: 0,
+                py: 0,
+              },
+            }}
+          >
+            <Box className="mobile-solve-primary">
+              {isMobileViewport && renderSolveControls("mobile")}
+            </Box>
+            {formula.length > 0 && (
+              <Box className="mobile-playback-controls" aria-label="公式回放控制">
+                {renderMobilePlaybackControls()}
+              </Box>
+            )}
+          </Box>
           <Box
             className="left-column"
             sx={{
@@ -1228,14 +1062,14 @@ export default function App() {
             sx={{
               minWidth: 0,
               alignSelf: "start",
-              p: { xs: 1.5, sm: 3.375 },
-              [MOBILE_LAYOUT_QUERY]: { gridArea: "cube", p: 0.75, border: "none", borderRadius: 0, bgcolor: "transparent" },
+              p: 0,
+              [MOBILE_LAYOUT_QUERY]: { gridArea: "cube", p: 0, border: "none", borderRadius: 0, bgcolor: "transparent" },
             }}
           >
             <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
               <Box>
                 <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
-                  01 · 输入与观察
+                  输入观察
                 </Typography>
                 <Typography id="cube-panel-title" component="h2" variant="h2">3D 魔方模型</Typography>
               </Box>
@@ -1245,7 +1079,7 @@ export default function App() {
             </Box>
 
             <Box
-              className="viewport-card"
+              className="viewport-card viewport"
               sx={{
                 position: "relative",
                 overflow: "hidden",
@@ -1261,15 +1095,19 @@ export default function App() {
                 animation={playbackAnimation}
                 animationDuration={Math.max(240, Math.min(520, playbackDelayMs * 0.72))}
                 onViewChange={handleViewChange}
-                onViewControlsReady={handleViewControlsReady}
               />
               <Box
                 className="view-readout"
                 aria-live="polite"
                 sx={{ px: 1.5, py: 1.25, color: "#a9bbc4", bgcolor: "#0d171e", borderTop: "1px solid #22313b" }}
-              >
+                >
                 <Typography component="p" sx={{ m: 0, fontSize: ".77rem", color: "inherit" }}>
-                  当前视角：正面 {faceLabel(viewFacing.front)} · 画面上方 {faceLabel(viewFacing.top)}
+                  <Box component="span" className="view-readout-full">
+                    当前视角：正面 {faceLabel(viewFacing.front)} · 画面上方 {faceLabel(viewFacing.top)}
+                  </Box>
+                  <Box component="span" className="view-readout-mobile">
+                    视角 {faceLabel(viewFacing.front)} · 上方 {faceLabel(viewFacing.top)}
+                  </Box>
                 </Typography>
               </Box>
             </Box>
@@ -1277,7 +1115,7 @@ export default function App() {
           </Paper>
 
           <Box
-            className="editor-bar"
+            className="editor-bar palette-panel"
             sx={{
               display: "flex",
               alignItems: { xs: "stretch", sm: "flex-end" },
@@ -1289,25 +1127,26 @@ export default function App() {
               [MOBILE_LAYOUT_QUERY]: { gridArea: "editor", px: 1.5, pt: 1.25, pb: 0.5 },
             }}
           >
-            <Box className="editor-copy" sx={{ [MOBILE_LAYOUT_QUERY]: { display: "none" } }}>
+            <Box className="editor-copy palette-copy">
               <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
                 3D 编辑
               </Typography>
-              <Typography component="p" sx={{ maxWidth: "32rem", m: 0, color: "text.secondary", fontSize: ".78rem", lineHeight: 1.5 }}>
+              <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".77rem", lineHeight: 1.5 }}>
                 选择颜色后点击模型上的贴纸；拖动模型可自由旋转视角。
               </Typography>
             </Box>
-            <Box className="editor-tools" aria-label="3D 贴纸颜色" sx={{ display: "flex", flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" }, gap: 0.875 }}>
+            <Box className="editor-tools palette-options" aria-label="3D 贴纸颜色" sx={{ display: "flex", flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" }, gap: 0.875 }}>
               {COLORS.map((color, index) => (
                 <Button
                   key={color}
-                  variant="contained"
+                  variant="outlined"
                   color="inherit"
                   type="button"
                   aria-label={`选择${color}色`}
                   aria-pressed={selectedColor === index}
                   data-color={index}
                   onClick={() => setSelectedColor(index)}
+                  className="color-button"
                   sx={{
                     minWidth: 37,
                     minHeight: 37,
@@ -1320,9 +1159,7 @@ export default function App() {
                     "&:hover": { bgcolor: STICKER_COLORS[index], filter: "brightness(1.1)" },
                     "&[aria-pressed=\"true\"]": { borderColor: "primary.main", boxShadow: "0 0 0 2px rgb(102 217 193 / 20%)" },
                   }}
-                >
-                  {color}
-                </Button>
+                />
               ))}
             </Box>
           </Box>
@@ -1362,7 +1199,7 @@ export default function App() {
                 maxHeight: formula.length
                   ? { xs: "min(640px, calc(100svh - 96px))", sm: "none" }
                   : { xs: "none", sm: "none" },
-                [theme.breakpoints.up("sm")]: { overflow: "hidden" },
+                ["@media (min-width: 560px)"]: { overflow: "hidden" },
                 [MOBILE_LAYOUT_QUERY]: {
                   gridArea: "solution",
                   height: formula.length ? "min(460px, calc(100svh - 280px))" : "auto",
@@ -1383,56 +1220,43 @@ export default function App() {
               <Box className="solution-heading" sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1.875 }}>
                 <Box>
                   <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
-                    02 · 逐步回放
+                    逐步回放
                   </Typography>
                   <Typography component="h2" variant="h2">解法公式</Typography>
                 </Box>
-                {formula.length > 0 && <Typography component="span" className="formula-count" sx={{ color: "primary.main", fontSize: ".72rem", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formula.length} 步</Typography>}
+                <Box className="formula-header-right">
+                  <Box className="formula-progress">
+                    <Typography component="span" className="progress-copy">{formulaProgress}</Typography>
+                    <Box className="progress-track" aria-hidden="true">
+                      <Box className="progress-fill" sx={{ width: formula.length > 0 ? `${Math.max(0, ((playbackIndex + 1) / formula.length) * 100)}%` : "0%" }} />
+                    </Box>
+                  </Box>
+                </Box>
               </Box>
+
+              {isMobileViewport && formula.length > 0 && (
+                <Box className="mobile-solution-player" aria-label="移动端播放器控制">
+                  <Box className="mobile-player-controls">
+                    {renderPlayerButtons()}
+                  </Box>
+                </Box>
+              )}
 
               <Box
                 className="formula-toolbar"
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) auto" },
-                  alignItems: "start",
-                  gap: 1.5,
                   mt: 1,
                   pt: 0.875,
                   pb: 1.25,
                   [MOBILE_LAYOUT_QUERY]: { display: "none" },
                 }}
               >
-                <Box className="formula-actions" sx={{ display: "grid", gridTemplateColumns: formula.length > 0 ? "repeat(4, minmax(0, 1fr))" : "minmax(0, 1fr)", gap: 0.625, minWidth: 0 }}>
-                  <Button type="button" onClick={copyFormula} disabled={!formula.length} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>复制公式</Button>
-                  {formula.length > 0 && <>
-                    <Button type="button" aria-label="上一步" onClick={() => setPlaybackStep(playbackIndex - 1)} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>← 上一步</Button>
-                    <Button type="button" aria-label="下一步" onClick={() => setPlaybackStep(playbackIndex + 1)} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>下一步 →</Button>
-                    <Button type="button" aria-label={playing ? "暂停播放" : "播放公式"} onClick={togglePlayback} sx={{ width: "100%", minWidth: 0, minHeight: 40, px: 0.875, fontSize: ".75rem", whiteSpace: "nowrap" }}>{playing ? "暂停" : "播放"}</Button>
-                  </>}
+                <Box className="formula-toolbar-top">
+                  <Button className="formula-copy-button" type="button" onClick={copyFormula} disabled={!formula.length}>复制公式</Button>
                 </Box>
                 {formula.length > 0 && (
-                  <FormControl className="speed-control" fullWidth size="small" sx={{ gridColumn: { xs: "1", sm: "2" }, width: { xs: "100%", sm: 112 }, minWidth: { sm: 112 } }}>
-                    <InputLabel id="speed-select-label">播放速度</InputLabel>
-                    <Select
-                      labelId="speed-select-label"
-                      id="speed-select"
-                      label="播放速度"
-                      aria-label="播放速度"
-                      value={speedPreset}
-                      onChange={(event) => setSpeedPreset(event.target.value as SpeedPreset)}
-                      renderValue={(value) => ({ slow: "慢速", standard: "标准", fast: "快速", custom: "自定义" }[value as SpeedPreset])}
-                    >
-                      <MenuItem value="slow">慢速（1.0 秒/步）</MenuItem>
-                      <MenuItem value="standard">标准（0.7 秒/步）</MenuItem>
-                      <MenuItem value="fast">快速（0.35 秒/步）</MenuItem>
-                      <MenuItem value="custom">自定义</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-                {formula.length > 0 && speedPreset === "custom" && (
-                  <Box className="custom-speed-control" sx={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "center", gap: 1.25, px: 0.75 }}>
-                    <Typography component="p" sx={{ m: 0, color: "text.secondary", fontSize: ".72rem", whiteSpace: "nowrap" }}>
+                  <Box className="custom-speed-control formula-toolbar-custom">
+                    <Typography component="p">
                       每步 {formatCustomSpeed(customSpeedSeconds)}
                     </Typography>
                     <Slider
@@ -1443,13 +1267,20 @@ export default function App() {
                       step={CUSTOM_SPEED_STEP_SECONDS}
                       valueLabelDisplay="auto"
                       valueLabelFormat={(value) => formatCustomSpeed(Number(value))}
-                      onChange={(_, value) => setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS)}
+                      onChange={(_, value) => {
+                        setCustomSpeedSeconds(typeof value === "number" ? value : value[0] ?? CUSTOM_SPEED_MIN_SECONDS);
+                      }}
                     />
+                  </Box>
+                )}
+                {formula.length > 0 && (
+                  <Box className="formula-player-controls" aria-label="播放器控制">
+                    {renderPlayerButtons()}
                   </Box>
                 )}
               </Box>
 
-              {formula.length > 0 && (
+              {formula.length > 0 ? (
                 <Box
                   component="ol"
                   ref={formulaListRef}
@@ -1472,7 +1303,7 @@ export default function App() {
                     scrollbarGutter: "stable",
                     overscrollBehavior: "contain",
                     listStyle: "none",
-                    [theme.breakpoints.up("sm")]: { overflowY: "hidden" },
+                    ["@media (min-width: 560px)"]: { overflowY: "hidden" },
                     "& > li": { minWidth: 0 },
                   }}
                 >
@@ -1501,17 +1332,22 @@ export default function App() {
                           borderColor: "#2b3a45",
                           textAlign: "left",
                           "&:hover": { backgroundColor: "#17232c", borderColor: "#3b5361" },
-                          "&[aria-current=\"step\"]": { color: "#f5ffff", backgroundColor: "#16332f", borderColor: "#66d9c1", boxShadow: "inset 3px 0 0 #66d9c1" },
+                          "&[aria-current=\"step\"]": { color: "#343438", backgroundColor: "#f2f5ff", borderColor: "rgba(37, 99, 235, .35)", boxShadow: "none" },
                           "&[data-played=\"true\"]": { borderColor: "#36544f", opacity: 0.72 },
                           [MOBILE_LAYOUT_QUERY]: { gridTemplateColumns: "25px minmax(0, 1fr)", gap: 0.625, px: 0.625 },
                         }}
                       >
-                        <Box component="span" className="move-number" sx={{ display: "grid", width: 27, height: 27, placeItems: "center", color: "#78909d", bgcolor: "#0b1116", borderRadius: "50%", fontSize: ".68rem", fontVariantNumeric: "tabular-nums" }}>{moveIndex + 1}</Box>
+                        <Box component="span" className="move-number" sx={{ display: "grid", width: 27, height: 27, placeItems: "center", color: "#78909d", bgcolor: "transparent", borderRadius: "50%", fontSize: ".68rem", fontVariantNumeric: "tabular-nums" }}>{moveIndex + 1}</Box>
                         <Box component="span" className="move-token" sx={{ color: "#8fe0d0", fontSize: ".91rem", fontWeight: 800 }}>{token}</Box>
                         <Box component="span" className="move-explanation" sx={{ minWidth: 0, overflowWrap: "anywhere", color: "#aebdc5", fontSize: ".75rem", lineHeight: 1.35, [MOBILE_LAYOUT_QUERY]: { display: "none" } }}>{explainMove(token)}</Box>
                       </Button>
                     </Box>
                   ))}
+                </Box>
+              ) : (
+                <Box className="formula-empty" aria-live="polite">
+                  <Typography component="p" className="formula-empty-title">解法尚未生成</Typography>
+                  <Typography component="p" className="formula-empty-copy">完成颜色观察后，点击“开始求解”生成可回放的移动序列。</Typography>
                 </Box>
               )}
             </Paper>
@@ -1520,28 +1356,17 @@ export default function App() {
               <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2.25, mb: 2.125 }}>
                 <Box>
                   <Typography component="p" className="section-kicker" sx={{ mb: 0.75, color: "#7893a2", fontSize: ".63rem", fontWeight: 750, letterSpacing: ".14em", lineHeight: 1.5 }}>
-                    03 · 校验与操作
+                  移动与校验
                   </Typography>
-                  <Typography id="control-panel-title" component="h2" variant="h2">移动与校验</Typography>
+                  <Typography id="control-panel-title" component="h2" variant="h2">快速移动</Typography>
                 </Box>
                 <Chip label={STATUS_LABELS[solveStatus]} size="small" variant="outlined" color="warning" sx={{ bgcolor: "rgb(228 184 120 / 9%)", borderColor: "rgb(228 184 120 / 25%)", whiteSpace: "nowrap" }} />
               </Box>
 
-              <Box className="move-entry" sx={{ display: "grid", gap: 0.75, mt: 2.125, color: "text.secondary", fontSize: ".75rem" }}>
-                <Typography component="label" htmlFor="move-notation" sx={{ color: "inherit", fontSize: "inherit" }}>执行 WCA 移动记号</Typography>
-                <Stack direction="row" spacing={0.875} className="move-row">
-                  <TextField
-                    id="move-notation"
-                    fullWidth
-                    size="small"
-                    placeholder="例如 R U' F2"
-                    slotProps={{ htmlInput: { 'aria-label': '移动记号' } }}
-                    value={move}
-                    onChange={(event) => setMove(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === "Enter") applyNotation(); }}
-                  />
-                  <Button type="button" onClick={applyNotation} sx={{ flex: "0 0 auto", whiteSpace: "nowrap", px: 1.375 }}>执行移动</Button>
-                </Stack>
+              <Box className="quick-moves" aria-label="快速移动">
+                {quickMoveNotations(order).map((notation) => (
+                  <Button className="quick-move" key={notation} type="button" onClick={() => applyQuickMove(notation)}>{notation}</Button>
+                ))}
               </Box>
 
               <Stack direction="row" spacing={0.875} useFlexGap className="button-row" sx={{ mt: 1.625, flexWrap: "wrap" }}>
@@ -1594,6 +1419,5 @@ export default function App() {
           </DialogActions>
         </Dialog>
       </Box>
-    </ThemeProvider>
   );
 }
