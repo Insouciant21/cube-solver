@@ -608,7 +608,6 @@ export default function CubeViewport({
           flexWrap: 'wrap',
           gap: { xs: 0.75, sm: 1.25 },
           p: { xs: 0.5, sm: 0.75 },
-          borderBottom: '1px solid #263945',
           bgcolor: '#0d171e',
           boxShadow: 'none',
         }}

@@ -1400,7 +1400,6 @@ export default function App() {
                   mt: 1,
                   pt: 0.875,
                   pb: 1.25,
-                  borderBottom: "1px solid #22313b",
                   [MOBILE_LAYOUT_QUERY]: { display: "none" },
                 }}
               >
